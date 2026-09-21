@@ -4,6 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>My Visuals</title>
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#e4e8ef" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#242832" media="(prefers-color-scheme: dark)">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Visuals">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%AB%A7%3C/text%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -611,7 +618,8 @@ details.info code{font-size:14px;color:var(--text)}
       const ra = r.headers && r.headers.get ? r.headers.get("retry-after") : null;
       r.limited = r.status === 429 || (r.status === 403 && (/rate limit|abuse|secondary/.test(msg) || !!ra));
       if (!r.limited || attempt >= 3) return r;
-      await sleep(Math.min(60, Number(ra) || 5 * (attempt + 1)) * 1000);
+      const secs = ra !== null && ra !== "" && !isNaN(Number(ra)) ? Number(ra) : 5 * (attempt + 1);
+      await sleep(Math.min(60, Math.max(1, secs)) * 1000);
     }
   }
   const clean = (it) => ({id:it.id, file:it.file, name:it.name, tags:it.tags || [], fav:!!it.fav, folder:it.folder || null,
@@ -1358,6 +1366,11 @@ details.info code{font-size:14px;color:var(--text)}
     render();
   }
   start();
+
+  // makes the page installable from Chrome (only works on https, like your github.io address)
+  if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")){
+    window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+  }
 })();
 </script>
 </body>
