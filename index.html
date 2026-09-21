@@ -260,23 +260,22 @@ header p{margin:4px 0 0;font-size:15px}
 
 <section id="settings" class="sheet" role="dialog" aria-modal="true" aria-labelledby="sTitle" hidden>
   <div class="sheethead">
-    <h2 id="sTitle">Connect uploads</h2>
+    <h2 id="sTitle">Connect your library</h2>
     <button class="round" id="sClose" type="button" aria-label="Close"></button>
   </div>
-  <p class="hint" style="margin:0 4px 14px">One-time setup so this page can save images to your GitHub repo.</p>
+  <p class="hint" style="margin:0 4px 14px">Your images live in a <b>private</b> repo. Only a device with your token can see or change them.</p>
   <ol class="steps">
-    <li>Make a <b>public</b> repo and turn on Pages (Settings, Pages, deploy from your main branch).</li>
-    <li>Upload this page to the repo as <b>index.html</b>.</li>
-    <li><a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">Create a token</a>. Pick <b>Only select repositories</b>, choose this repo, and set <b>Contents</b> to <b>Read and write</b>.</li>
+    <li>Create a <b>private</b> repo for your data, e.g. <b>visuals-data</b>. Leave it empty.</li>
+    <li><a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">Create a token</a>. Pick <b>Only select repositories</b>, choose the private repo, and set <b>Contents</b> to <b>Read and write</b>.</li>
     <li>Paste your details below.</li>
   </ol>
   <label class="field" style="margin-top:12px"><span class="lbl">GitHub username</span>
     <input id="sOwner" type="text" autocomplete="off" autocapitalize="none" spellcheck="false"></label>
-  <label class="field"><span class="lbl">Repository name</span>
-    <input id="sRepo" type="text" autocomplete="off" autocapitalize="none" spellcheck="false"></label>
+  <label class="field"><span class="lbl">Private repo name</span>
+    <input id="sRepo" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="visuals-data"></label>
   <label class="field"><span class="lbl">Token</span>
     <input id="sToken" type="password" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="github_pat_…"></label>
-  <p class="hint">The token stays on this device only. Anyone can view the gallery, but only a device with the token can change it.</p>
+  <p class="hint">The token stays on this device only. Without it, this page shows nothing and can't upload.</p>
   <div id="sMsg" class="formmsg" role="status"></div>
   <div class="actions" style="margin-top:14px">
     <button class="btn" id="sSave" type="button">Save and connect</button>
@@ -307,17 +306,13 @@ header p{margin:4px 0 0;font-size:15px}
   // ---------- config ----------
   function detect(){
     const h = location.hostname;
-    if (!h.endsWith(".github.io")) return {};
-    const owner = h.split(".")[0];
-    const seg = location.pathname.split("/")[1];
-    const repo = seg && !seg.includes(".") ? seg : owner + ".github.io";
-    return {owner, repo};
+    return h.endsWith(".github.io") ? {owner: h.split(".")[0]} : {};
   }
   function loadCfg(){
     let saved = {};
     try { saved = JSON.parse(localStorage.getItem(LS) || "{}"); } catch (e) {}
     const d = detect();
-    return {owner: saved.owner || d.owner || "", repo: saved.repo || d.repo || "", branch: saved.branch || "main", token: saved.token || ""};
+    return {owner: saved.owner || d.owner || "", repo: saved.repo || "", branch: saved.branch || "main", token: saved.token || ""};
   }
   function saveCfg(){ try { localStorage.setItem(LS, JSON.stringify(cfg)); } catch (e) {} }
   let cfg = loadCfg();
@@ -363,8 +358,43 @@ header p{margin:4px 0 0;font-size:15px}
   const safeName = (n) => (n || "image").replace(/[\\/:*?"<>|]+/g, "-").trim() || "image";
   const slug = (n) => baseName(n).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "image";
   const find = (id) => state.items.find((i) => i.id === id);
-  const rawUrl = (it) => `https://raw.githubusercontent.com/${cfg.owner}/${cfg.repo}/${cfg.branch}/images/${it.file}`;
-  const imgUrl = (it) => it._url || "images/" + it.file;
+  const mimeOf = (path) => BY_EXT[(path.split(".").pop() || "").toLowerCase()] || "application/octet-stream";
+  const urlCache = new Map();
+  let active = 0; const waiting = [];
+  function pump(){
+    while (active < 4 && waiting.length){
+      const job = waiting.shift(); active++;
+      job().finally(() => { active--; pump(); });
+    }
+  }
+  function queue(fn){ return new Promise((res, rej) => { waiting.push(() => fn().then(res, rej)); pump(); }); }
+  function fetchBlobUrl(path){
+    if (urlCache.has(path)) return Promise.resolve(urlCache.get(path));
+    return queue(async () => {
+      if (urlCache.has(path)) return urlCache.get(path);
+      const res = await fetch(`https://api.github.com/repos/${cfg.owner}/${cfg.repo}/contents/${path}?ref=${encodeURIComponent(cfg.branch)}`,
+        {headers:{"Accept":"application/vnd.github.raw+json","X-GitHub-Api-Version":"2022-11-28","Authorization":"Bearer " + cfg.token}});
+      if (!res.ok) throw new Error("status " + res.status);
+      const url = URL.createObjectURL(new Blob([await res.arrayBuffer()], {type: mimeOf(path)}));
+      urlCache.set(path, url);
+      return url;
+    });
+  }
+  function getUrl(it, thumb){
+    if (it._url) return Promise.resolve(it._url);
+    return fetchBlobUrl(thumb && it.thumb ? "thumbs/" + it.thumb : "images/" + it.file);
+  }
+  const io = "IntersectionObserver" in window
+    ? new IntersectionObserver((entries) => {
+        for (const e of entries) if (e.isIntersecting){ io.unobserve(e.target); if (e.target._load) e.target._load(); }
+      }, {rootMargin:"300px"})
+    : null;
+  function lazyImg(it, alt){
+    const img = h("img", {alt, decoding:"async"});
+    img._load = () => getUrl(it, true).then((u) => { img.src = u; }, () => { img.replaceWith(icon("image")); });
+    if (io) io.observe(img); else img._load();
+    return img;
+  }
   function textB64(s){
     const bytes = new TextEncoder().encode(s); let bin = "";
     for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
@@ -406,25 +436,24 @@ header p{margin:4px 0 0;font-size:15px}
     let json = null; try { json = await res.json(); } catch (e) {}
     return {ok: res.ok, status: res.status, json};
   }
-  const clean = (it) => ({id:it.id, file:it.file, name:it.name, tags:it.tags || [], fav:!!it.fav, createdAt:it.createdAt, size:it.size, type:it.type, sha:it.sha});
+  const clean = (it) => ({id:it.id, file:it.file, name:it.name, tags:it.tags || [], fav:!!it.fav, createdAt:it.createdAt, size:it.size, type:it.type, sha:it.sha, thumb:it.thumb});
   function norm(items){
     return (Array.isArray(items) ? items : []).filter((i) => i && typeof i.file === "string").map((i) => Object.assign({tags:[], fav:false}, i))
       .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
   }
   async function loadLibrary(){
-    if (canEdit){
-      const r = await gh("GET", "contents/library.json?ref=" + encodeURIComponent(cfg.branch));
-      if (r.status === 404){ state.items = []; state.sha = null; return; }
-      if (!r.ok) throw {status: r.status};
-      state.sha = r.json.sha;
-      let text = r.json.content ? b64Text(r.json.content) : await (await fetch(r.json.download_url)).text();
-      state.items = norm(JSON.parse(text).items);
-    } else {
-      const res = await fetch("library.json?t=" + Date.now(), {cache:"no-store"});
-      if (res.status === 404){ state.items = []; return; }
-      if (!res.ok) throw {status: res.status};
-      state.items = norm((await res.json()).items);
+    const r = await gh("GET", "contents/library.json?ref=" + encodeURIComponent(cfg.branch));
+    if (r.status === 404){ state.items = []; state.sha = null; return; }
+    if (!r.ok) throw {status: r.status};
+    state.sha = r.json.sha;
+    let text;
+    if (r.json.content) text = b64Text(r.json.content);
+    else {
+      const raw = await fetch(`https://api.github.com/repos/${cfg.owner}/${cfg.repo}/contents/library.json?ref=${encodeURIComponent(cfg.branch)}`,
+        {headers:{"Accept":"application/vnd.github.raw+json","Authorization":"Bearer " + cfg.token}});
+      text = await raw.text();
     }
+    state.items = norm(JSON.parse(text).items);
   }
   async function refreshSha(){
     const r = await gh("GET", "contents/library.json?ref=" + encodeURIComponent(cfg.branch));
@@ -513,15 +542,8 @@ header p{margin:4px 0 0;font-size:15px}
     );
     box.scrollLeft = left;
   }
-  function withFallback(img, it){
-    img.addEventListener("error", () => {
-      if (!img.dataset.fb && !it._url){ img.dataset.fb = "1"; img.src = rawUrl(it); }
-      else img.replaceWith(icon("image"));
-    });
-    return img;
-  }
   function tile(it){
-    const img = withFallback(h("img", {src:imgUrl(it), alt:it.name || "", loading:"lazy", decoding:"async"}), it);
+    const img = lazyImg(it, it.name || "");
     const kids = [
       h("button", {class:"open", type:"button", "aria-label":"Open " + (it.name || "image"), onclick:() => openDetail(it.id)},
         h("div", {class:"thumb"}, img),
@@ -535,6 +557,7 @@ header p{margin:4px 0 0;font-size:15px}
   function renderGrid(){
     const grid = $("#grid"), empty = $("#empty");
     const list = visible();
+    if (io) io.disconnect();
     grid.replaceChildren(...list.map(tile));
     grid.hidden = list.length === 0;
     if (list.length){ empty.hidden = true; return; }
@@ -543,12 +566,12 @@ header p{margin:4px 0 0;font-size:15px}
       empty.replaceChildren(icon("image"), h("h2", {text:"Loading"}), h("p", {text:"Getting your images ready."}));
     } else if (state.error){
       empty.replaceChildren(icon("image"), h("h2", {text:"Library unavailable"}),
-        h("p", {text: canEdit ? "Check your connection or reconnect in settings." : "Make sure Pages is on and this file is named index.html."}),
+        h("p", {text: "Check your connection or reconnect in settings."}),
         h("button", {class:"btn", type:"button", text:"Open settings", onclick:openSettings}));
     } else if (state.items.length === 0){
       if (canEdit) empty.replaceChildren(icon("image"), h("h2", {text:"Your library is empty"}), h("p", {text:"Tap Add images to upload icons and graphics."}));
-      else empty.replaceChildren(icon("image"), h("h2", {text:"Your library is empty"}), h("p", {text:"Connect your GitHub repo to start adding images."}),
-        h("button", {class:"btn", type:"button", text:"Set up uploads", onclick:openSettings}));
+      else empty.replaceChildren(icon("image"), h("h2", {text:"Connect your library"}), h("p", {text:"Link your private repo to see and add images."}),
+        h("button", {class:"btn", type:"button", text:"Connect", onclick:openSettings}));
     } else {
       empty.replaceChildren(icon("search"), h("h2", {text:"No matches"}), h("p", {text:"Try a different word or tag."}),
         h("button", {class:"btn", type:"button", text:"Clear filters", onclick:() => {
@@ -583,9 +606,8 @@ header p{margin:4px 0 0;font-size:15px}
     const it = find(id); if (!it) return;
     state.openId = id;
     const img = $("#dImg");
-    img.removeAttribute("data-fb");
-    img.onerror = () => { if (!img.dataset.fb && !it._url){ img.dataset.fb = "1"; img.src = rawUrl(it); } };
-    img.src = imgUrl(it); img.alt = it.name || "";
+    img.removeAttribute("src"); img.alt = it.name || "";
+    getUrl(it, false).then((u) => { if (state.openId === it.id) img.src = u; }, () => toast("Couldn't load this image."));
     $("#dName").value = it.name || "";
     $("#dName").readOnly = !canEdit;
     $("#dAddRow").hidden = !canEdit;
@@ -623,16 +645,11 @@ header p{margin:4px 0 0;font-size:15px}
   async function download(){
     const it = find(state.openId); if (!it) return;
     try {
-      let r = await fetch(imgUrl(it));
-      if (!r.ok) r = await fetch(rawUrl(it));
-      if (!r.ok) throw new Error("fetch");
-      const blob = await r.blob();
       const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
+      a.href = await getUrl(it, false);
       a.download = safeName(it.name) + "." + (it.file.split(".").pop() || "png");
       document.body.append(a); a.click(); a.remove();
-      setTimeout(() => URL.revokeObjectURL(a.href), 4000);
-    } catch (e) { toast("Couldn't download. Press and hold the image to save it."); }
+    } catch (e) { toast("Couldn't download this image."); }
   }
   async function remove(){
     const it = find(state.openId); if (!it || !canEdit) return;
@@ -646,14 +663,32 @@ header p{margin:4px 0 0;font-size:15px}
     state.items = state.items.filter((x) => x.id !== it.id);
     closeSheets(); render(); toast("Deleted");
     await flushSave();
-    try {
-      let sha = it.sha;
-      if (!sha){ const r = await gh("GET", "contents/images/" + it.file + "?ref=" + encodeURIComponent(cfg.branch)); sha = r.ok ? r.json.sha : null; }
-      if (sha) await gh("DELETE", "contents/images/" + it.file, {message:"Delete " + it.file, sha, branch:cfg.branch});
-    } catch (e) {}
+    const delFile = async (path, known) => {
+      try {
+        let sha = known;
+        if (!sha){ const r = await gh("GET", path + "?ref=" + encodeURIComponent(cfg.branch)); sha = r.ok ? r.json.sha : null; }
+        if (sha) await gh("DELETE", path, {message:"Delete " + path, sha, branch:cfg.branch});
+      } catch (e) {}
+    };
+    await delFile("contents/images/" + it.file, it.sha);
+    if (it.thumb) await delFile("contents/thumbs/" + it.thumb);
   }
 
   // ---------- upload ----------
+  async function makeThumb(file, type){
+    if (type === "image/gif" || type === "image/svg+xml") return null;
+    try {
+      const bmp = await createImageBitmap(file);
+      const s = Math.min(1, 480 / Math.max(bmp.width, bmp.height));
+      const c = document.createElement("canvas");
+      c.width = Math.max(1, Math.round(bmp.width * s)); c.height = Math.max(1, Math.round(bmp.height * s));
+      c.getContext("2d").drawImage(bmp, 0, 0, c.width, c.height);
+      if (bmp.close) bmp.close();
+      const blob = await new Promise((r) => c.toBlob(r, "image/webp", 0.85));
+      if (!blob) return null;
+      return {blob, ext: blob.type === "image/png" ? "png" : "webp"};
+    } catch (e) { return null; }
+  }
   function normType(f){
     if (EXT[f.type]) return f.type;
     const m = /\.([a-z0-9]+)$/i.exec(f.name || "");
@@ -696,7 +731,14 @@ header p{margin:4px 0 0;font-size:15px}
           if ([401, 403, 404].includes(r.status)){ fatal = r.status; failed += n - i; break; }
           failed++; continue;
         }
-        added.push({id, file:name, name:baseName(file.name), tags, fav:false, createdAt:Date.now() + (n - i), size:blob.size, type, sha:r.json.content.sha, _url:URL.createObjectURL(blob)});
+        let thumb;
+        const t = await makeThumb(blob, type);
+        if (t){
+          const tn = name.replace(/\.[^.]+$/, "") + "." + t.ext;
+          const tr = await gh("PUT", "contents/thumbs/" + tn, {message:"Add thumbnail " + tn, branch:cfg.branch, content: await blobB64(t.blob)});
+          if (tr.ok) thumb = tn;
+        }
+        added.push({id, file:name, name:baseName(file.name), tags, fav:false, createdAt:Date.now() + (n - i), size:blob.size, type, sha:r.json.content.sha, thumb, _url:URL.createObjectURL(blob)});
       } catch (e) { failed++; }
     }
     state.uploading = false; $("#upClose").disabled = false;
@@ -735,7 +777,7 @@ header p{margin:4px 0 0;font-size:15px}
       else {
         cfg.branch = r.json.default_branch || "main";
         saveCfg(); canEdit = true;
-        closeSheets(); toast("Connected");
+        closeSheets(); toast(r.json.private === false ? "Connected, but this repo is public. Make it private in the repo settings." : "Connected");
         await start();
       }
     } catch (e) { cfg = prev; sMsg("Couldn't reach GitHub. Check your connection.", true); }
@@ -743,6 +785,7 @@ header p{margin:4px 0 0;font-size:15px}
   }
   function disconnect(){
     cfg.token = ""; saveCfg(); canEdit = false;
+    urlCache.forEach((u) => URL.revokeObjectURL(u)); urlCache.clear();
     closeSheets(); toast("Disconnected. This device is view-only now.");
     start();
   }
@@ -785,17 +828,16 @@ header p{margin:4px 0 0;font-size:15px}
 
   async function start(){
     state.loaded = false; state.error = null; banner(""); render();
+    if (!canEdit){ state.items = []; state.loaded = true; render(); return; }
     try {
       await loadLibrary();
     } catch (e) {
-      if (canEdit && e && e.status === 401){
-        canEdit = false;
-        banner("GitHub rejected your token. Open settings to reconnect. You're viewing in read-only mode.");
-        try { await loadLibrary(); } catch (e2) { state.error = true; }
+      if (e && e.status === 401){
+        canEdit = false; state.items = [];
+        banner("GitHub rejected your token. Open settings to reconnect.");
       } else state.error = true;
     }
     state.loaded = true;
-    if (!canEdit && !cfg.token && !state.error && state.items.length) banner("View only. Tap the gear to connect uploads on this device.");
     render();
   }
   start();
