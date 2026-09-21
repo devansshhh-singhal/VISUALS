@@ -1,0 +1,805 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>My Visuals</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%AB%A7%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@500;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  color-scheme: light;
+  --bg:#e4e8ef; --sd:rgba(158,170,192,.75); --sl:rgba(255,255,255,.95);
+  --text:#2d3445; --muted:#5b647a; --accent:#4453d1; --accent-ink:#ffffff;
+  --heart:#d8455f; --danger:#b8344b; --scrim:rgba(30,36,52,.35);
+  --raise:6px 6px 14px var(--sd), -6px -6px 14px var(--sl);
+  --raise-sm:3px 3px 8px var(--sd), -3px -3px 8px var(--sl);
+  --inset:inset 3px 3px 7px var(--sd), inset -3px -3px 7px var(--sl);
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme: dark;
+    --bg:#242832; --sd:rgba(10,12,18,.7); --sl:rgba(64,71,88,.55);
+    --text:#e8ebf3; --muted:#a3adc2; --accent:#a3aeff; --accent-ink:#1a1f3d;
+    --heart:#ff8296; --danger:#ff8a9a; --scrim:rgba(0,0,0,.55);
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --bg:#242832; --sd:rgba(10,12,18,.7); --sl:rgba(64,71,88,.55);
+  --text:#e8ebf3; --muted:#a3adc2; --accent:#a3aeff; --accent-ink:#1a1f3d;
+  --heart:#ff8296; --danger:#ff8a9a; --scrim:rgba(0,0,0,.55);
+}
+*,*::before,*::after{box-sizing:inherit}
+html{scroll-padding-top:env(safe-area-inset-top,0px);-webkit-text-size-adjust:100%}
+[hidden]{display:none!important}
+body{
+  margin:0;background:var(--bg);color:var(--text);
+  font-family:"Nunito",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  font-weight:500;font-size:16px;line-height:1.45;
+  -webkit-tap-highlight-color:transparent;
+}
+body.lock{overflow:hidden}
+button,input{font:inherit;color:inherit}
+button{cursor:pointer}
+a{color:var(--accent);font-weight:700}
+:focus-visible{outline:3px solid var(--accent);outline-offset:3px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.muted{color:var(--muted)}
+.ico{display:inline-flex;align-items:center;justify-content:center;line-height:0}
+.ico svg{width:22px;height:22px}
+
+.app{max-width:860px;margin:0 auto;padding:26px 18px 150px}
+.top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+h1{margin:0;font-size:32px;font-weight:800;letter-spacing:-.01em}
+header p{margin:4px 0 0;font-size:15px}
+.sync{border:0;background:none;padding:0;font-weight:700;font-size:14px;color:var(--muted);margin-top:2px}
+.sync[data-s="error"]{color:var(--danger);text-decoration:underline}
+
+.banner{margin:20px 2px 0;padding:14px 18px;border-radius:18px;box-shadow:var(--inset);color:var(--muted);font-size:15px}
+
+.search{position:relative;display:block;margin:24px 2px 8px}
+.search .ico{position:absolute;left:18px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none}
+.search input{
+  width:100%;height:52px;border:0;border-radius:999px;background:var(--bg);
+  box-shadow:var(--inset);padding:0 20px 0 50px;font-size:16px;outline-offset:3px;
+}
+.search input::placeholder{color:var(--muted);opacity:1}
+.search input::-webkit-search-cancel-button{-webkit-appearance:none}
+
+.chips{display:flex;gap:14px;overflow-x:auto;padding:12px 6px 20px;margin:0 -6px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{
+  flex:none;min-height:42px;padding:0 18px;border:0;border-radius:999px;background:var(--bg);
+  box-shadow:var(--raise-sm);font-weight:700;font-size:15px;display:inline-flex;align-items:center;gap:8px;
+}
+.chip small{font-size:13px;font-weight:700;color:var(--muted)}
+.chip[aria-pressed="true"]{box-shadow:var(--inset);color:var(--accent)}
+.chip .ico svg{width:18px;height:18px}
+
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;padding:6px 4px}
+@media (min-width:560px){.grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (min-width:820px){.grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.tile{position:relative;border-radius:24px;background:var(--bg);box-shadow:var(--raise)}
+.tile .open{display:block;width:100%;border:0;background:none;padding:10px 10px 12px;text-align:left;border-radius:24px}
+.thumb{aspect-ratio:1;border-radius:16px;box-shadow:var(--inset);display:grid;place-items:center;padding:12px;overflow:hidden;color:var(--muted)}
+.thumb img{max-width:100%;max-height:100%;object-fit:contain;display:block}
+.tile .name{margin:10px 6px 0;font-weight:700;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.heart{
+  position:absolute;top:16px;right:16px;width:44px;height:44px;border:0;border-radius:50%;
+  background:var(--bg);box-shadow:var(--raise-sm);color:var(--muted);display:grid;place-items:center;padding:0;
+}
+.heart[aria-pressed="true"]{color:var(--heart);box-shadow:var(--inset)}
+.heart[aria-pressed="true"] .ico svg{fill:currentColor}
+.heart .ico svg{width:20px;height:20px}
+
+.empty{margin:36px auto 0;max-width:340px;text-align:center;padding:30px 24px;border-radius:28px;box-shadow:var(--inset);color:var(--muted)}
+.empty .ico svg{width:44px;height:44px}
+.empty h2{margin:14px 0 6px;font-size:20px;color:var(--text)}
+.empty p{margin:0 0 4px}
+.empty .btn{margin-top:16px}
+
+.btn{
+  min-height:48px;padding:0 22px;border:0;border-radius:999px;background:var(--bg);color:var(--accent);
+  font-weight:800;font-size:16px;display:inline-flex;align-items:center;justify-content:center;gap:10px;
+  box-shadow:var(--raise-sm);
+}
+.btn:active,.btn[aria-pressed="true"]{box-shadow:var(--inset)}
+.btn[disabled]{opacity:.6;pointer-events:none}
+.btn.danger{color:var(--danger)}
+.btn.small{min-height:44px;padding:0 18px}
+.btn .ico svg{width:20px;height:20px}
+.btn[aria-pressed="true"] .ico{color:var(--heart)}
+.btn[aria-pressed="true"] .ico svg{fill:currentColor}
+
+.dock{
+  position:fixed;left:0;right:0;bottom:0;z-index:10;display:flex;justify-content:center;pointer-events:none;
+  padding:26px 18px calc(18px + env(safe-area-inset-bottom,0px));
+  background:linear-gradient(to top,var(--bg) 55%,transparent);
+}
+.cta{
+  pointer-events:auto;min-height:56px;padding:0 30px;border:0;border-radius:999px;
+  background:var(--accent);color:var(--accent-ink);font-weight:800;font-size:17px;
+  display:inline-flex;align-items:center;gap:10px;box-shadow:var(--raise);
+}
+.cta:active{box-shadow:inset 3px 3px 8px rgba(0,0,0,.28)}
+
+.backdrop{position:fixed;inset:0;background:var(--scrim);z-index:20}
+.sheet{
+  position:fixed;left:0;right:0;bottom:0;z-index:30;margin:0 auto;max-width:640px;max-height:92%;overflow-y:auto;
+  background:var(--bg);border-radius:30px 30px 0 0;box-shadow:0 -10px 34px var(--sd);
+  padding:20px 22px calc(26px + env(safe-area-inset-bottom,0px));
+  animation:rise .22s ease-out;
+}
+@keyframes rise{from{transform:translateY(40px);opacity:0}to{transform:none;opacity:1}}
+@media (prefers-reduced-motion:reduce){.sheet{animation:none}.toast{transition:none}}
+.sheethead{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.sheethead h2{margin:0;font-size:22px;font-weight:800}
+.round{width:46px;height:46px;border:0;border-radius:50%;background:var(--bg);box-shadow:var(--raise-sm);display:grid;place-items:center;padding:0}
+.round:active{box-shadow:var(--inset)}
+.preview{aspect-ratio:4/3;border-radius:22px;box-shadow:var(--inset);display:grid;place-items:center;padding:16px;overflow:hidden}
+.preview img{max-width:100%;max-height:100%;object-fit:contain}
+.field{display:block;margin-top:20px}
+.lbl{display:block;margin:0 4px 8px;font-weight:700;font-size:15px;color:var(--muted)}
+.field input[type="text"],.field input[type="password"],.addrow input{
+  width:100%;height:50px;border:0;border-radius:16px;background:var(--bg);box-shadow:var(--inset);padding:0 16px;font-size:16px;
+}
+.addrow{display:flex;gap:12px;align-items:center;margin-top:12px}
+.taglist{display:flex;flex-wrap:wrap;gap:10px}
+.tag{display:inline-flex;align-items:center;gap:2px;min-height:38px;padding:0 4px 0 14px;border-radius:999px;box-shadow:var(--raise-sm);font-weight:700;font-size:14px}
+.tag.ro{padding:0 14px}
+.tag button{width:34px;height:34px;border:0;background:none;border-radius:50%;display:grid;place-items:center;padding:0;color:var(--muted)}
+.tag .ico svg{width:16px;height:16px}
+.notags{margin:0 4px;color:var(--muted);font-size:15px}
+.actions{display:flex;flex-wrap:wrap;gap:14px;margin-top:26px}
+.strip{display:flex;gap:12px;overflow-x:auto;padding:8px 6px 16px;margin:0 -6px;scrollbar-width:none}
+.strip::-webkit-scrollbar{display:none}
+.strip .sm{flex:none;width:68px;height:68px;border-radius:16px;box-shadow:var(--inset);display:grid;place-items:center;padding:6px;overflow:hidden}
+.strip .sm img{max-width:100%;max-height:100%;object-fit:contain}
+.suggest{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}
+.hint{margin:8px 4px 0;font-size:14px;color:var(--muted)}
+.check{display:flex;align-items:center;gap:12px;margin:22px 4px 0;font-weight:700;font-size:15px}
+.check input{width:24px;height:24px;accent-color:var(--accent);flex:none}
+.uprow{display:flex;gap:14px;margin-top:24px;align-items:center;flex-wrap:wrap}
+.uprow .status{color:var(--muted);font-weight:700;font-size:15px}
+.steps{margin:0 0 4px;padding-left:22px;font-size:15px;color:var(--text)}
+.steps li{margin:0 0 10px}
+.formmsg{margin:14px 4px 0;font-weight:700;font-size:15px;min-height:1.4em}
+.formmsg.bad{color:var(--danger)}
+
+.toast{
+  position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom,0px));transform:translate(-50%,12px);
+  z-index:40;max-width:min(88vw,420px);padding:12px 20px;border-radius:18px;background:var(--bg);color:var(--text);
+  box-shadow:var(--raise);font-weight:700;font-size:15px;text-align:center;opacity:0;pointer-events:none;
+  transition:opacity .2s,transform .2s;
+}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+</style>
+</head>
+<body>
+<main class="app">
+  <header>
+    <div class="top">
+      <div>
+        <h1>My Visuals</h1>
+        <p id="meta" class="muted">Loading your library…</p>
+        <button id="sync" class="sync" type="button" hidden></button>
+      </div>
+      <button class="round" id="gear" type="button" aria-label="Settings"></button>
+    </div>
+  </header>
+
+  <div id="banner" class="banner" hidden></div>
+
+  <label class="search">
+    <span class="sr">Search your visuals</span>
+    <span class="ico" id="searchIco"></span>
+    <input id="q" type="search" placeholder="Search by name or tag" autocomplete="off" enterkeyhint="search">
+  </label>
+
+  <div id="chips" class="chips" role="group" aria-label="Filter by tag"></div>
+  <section id="grid" class="grid" aria-live="polite"></section>
+  <div id="empty" class="empty" hidden></div>
+</main>
+
+<div class="dock" id="dock" hidden>
+  <button class="cta" id="addBtn" type="button"><span class="ico" id="addIco"></span>Add images</button>
+  <input id="file" type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml,.svg" multiple hidden>
+</div>
+
+<div id="backdrop" class="backdrop" hidden></div>
+
+<section id="upload" class="sheet" role="dialog" aria-modal="true" aria-labelledby="upTitle" hidden>
+  <div class="sheethead">
+    <h2 id="upTitle">Add images</h2>
+    <button class="round" id="upClose" type="button" aria-label="Close"></button>
+  </div>
+  <div id="upStrip" class="strip"></div>
+  <label class="field" style="margin-top:6px">
+    <span class="lbl">Tags for all of these (optional)</span>
+    <input id="upTags" type="text" placeholder="cat, line, pastel" autocomplete="off" enterkeyhint="done">
+  </label>
+  <p class="hint">Separate tags with commas. Tap one below to reuse it.</p>
+  <div id="upSuggest" class="suggest"></div>
+  <label class="check"><input type="checkbox" id="upShrink" checked>Shrink very large photos (recommended)</label>
+  <div class="uprow">
+    <button class="btn" id="upGo" type="button"></button>
+    <span class="status" id="upStatus" role="status"></span>
+  </div>
+</section>
+
+<section id="detail" class="sheet" role="dialog" aria-modal="true" aria-labelledby="dTitle" hidden>
+  <div class="sheethead">
+    <h2 id="dTitle">Details</h2>
+    <button class="round" id="dClose" type="button" aria-label="Close"></button>
+  </div>
+  <div class="preview"><img id="dImg" alt=""></div>
+  <label class="field">
+    <span class="lbl">Name</span>
+    <input id="dName" type="text" maxlength="80" autocomplete="off" enterkeyhint="done">
+  </label>
+  <div class="field">
+    <span class="lbl">Tags</span>
+    <div id="dTags" class="taglist"></div>
+    <div class="addrow" id="dAddRow">
+      <input id="dTagIn" type="text" placeholder="Add tags, separated by commas" aria-label="Add tags" autocomplete="off" enterkeyhint="done">
+      <button class="btn small" id="dTagAdd" type="button">Add</button>
+    </div>
+  </div>
+  <div class="actions">
+    <button class="btn" id="dFav" type="button" aria-pressed="false"></button>
+    <button class="btn" id="dDl" type="button"></button>
+    <button class="btn danger" id="dDel" type="button"></button>
+  </div>
+</section>
+
+<section id="settings" class="sheet" role="dialog" aria-modal="true" aria-labelledby="sTitle" hidden>
+  <div class="sheethead">
+    <h2 id="sTitle">Connect uploads</h2>
+    <button class="round" id="sClose" type="button" aria-label="Close"></button>
+  </div>
+  <p class="hint" style="margin:0 4px 14px">One-time setup so this page can save images to your GitHub repo.</p>
+  <ol class="steps">
+    <li>Make a <b>public</b> repo and turn on Pages (Settings, Pages, deploy from your main branch).</li>
+    <li>Upload this page to the repo as <b>index.html</b>.</li>
+    <li><a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">Create a token</a>. Pick <b>Only select repositories</b>, choose this repo, and set <b>Contents</b> to <b>Read and write</b>.</li>
+    <li>Paste your details below.</li>
+  </ol>
+  <label class="field" style="margin-top:12px"><span class="lbl">GitHub username</span>
+    <input id="sOwner" type="text" autocomplete="off" autocapitalize="none" spellcheck="false"></label>
+  <label class="field"><span class="lbl">Repository name</span>
+    <input id="sRepo" type="text" autocomplete="off" autocapitalize="none" spellcheck="false"></label>
+  <label class="field"><span class="lbl">Token</span>
+    <input id="sToken" type="password" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="github_pat_…"></label>
+  <p class="hint">The token stays on this device only. Anyone can view the gallery, but only a device with the token can change it.</p>
+  <div id="sMsg" class="formmsg" role="status"></div>
+  <div class="actions" style="margin-top:14px">
+    <button class="btn" id="sSave" type="button">Save and connect</button>
+    <button class="btn danger" id="sOut" type="button">Disconnect this device</button>
+  </div>
+</section>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<script>
+(() => {
+  const $ = (s) => document.querySelector(s);
+  const P = 'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"';
+  const ICONS = {
+    plus:`<svg viewBox="0 0 24 24" ${P}><path d="M12 5v14M5 12h14"/></svg>`,
+    heart:`<svg viewBox="0 0 24 24" ${P}><path d="M12 20s-7-4.6-9-9.2C1.7 7.6 3.6 4.5 6.8 4.5c2 0 3.4 1 5.2 3 1.8-2 3.2-3 5.2-3 3.2 0 5.1 3.1 3.8 6.3C19 15.4 12 20 12 20z"/></svg>`,
+    search:`<svg viewBox="0 0 24 24" ${P}><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>`,
+    close:`<svg viewBox="0 0 24 24" ${P}><path d="M6 6l12 12M18 6L6 18"/></svg>`,
+    download:`<svg viewBox="0 0 24 24" ${P}><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></svg>`,
+    trash:`<svg viewBox="0 0 24 24" ${P}><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg>`,
+    image:`<svg viewBox="0 0 24 24" ${P}><rect x="3" y="4" width="18" height="16" rx="4"/><circle cx="9" cy="10" r="1.6"/><path d="M4 18l5-5 4 4 3-3 4 4"/></svg>`,
+    gear:`<svg viewBox="0 0 24 24" ${P}><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/></svg>`
+  };
+  const EXT = {"image/png":"png","image/jpeg":"jpg","image/gif":"gif","image/webp":"webp","image/svg+xml":"svg"};
+  const BY_EXT = {png:"image/png",jpg:"image/jpeg",jpeg:"image/jpeg",gif:"image/gif",webp:"image/webp",svg:"image/svg+xml"};
+  const LS = "visualsLibrary.v1";
+
+  // ---------- config ----------
+  function detect(){
+    const h = location.hostname;
+    if (!h.endsWith(".github.io")) return {};
+    const owner = h.split(".")[0];
+    const seg = location.pathname.split("/")[1];
+    const repo = seg && !seg.includes(".") ? seg : owner + ".github.io";
+    return {owner, repo};
+  }
+  function loadCfg(){
+    let saved = {};
+    try { saved = JSON.parse(localStorage.getItem(LS) || "{}"); } catch (e) {}
+    const d = detect();
+    return {owner: saved.owner || d.owner || "", repo: saved.repo || d.repo || "", branch: saved.branch || "main", token: saved.token || ""};
+  }
+  function saveCfg(){ try { localStorage.setItem(LS, JSON.stringify(cfg)); } catch (e) {} }
+  let cfg = loadCfg();
+  let canEdit = !!(cfg.token && cfg.owner && cfg.repo);
+
+  const state = {items:[], tag:null, fav:false, q:"", loaded:false, error:null, openId:null, pending:[], uploading:false, sha:null, sync:"saved"};
+  let previewUrls = [];
+
+  // ---------- helpers ----------
+  function h(tag, props = {}, ...kids){
+    const e = document.createElement(tag);
+    for (const [k, v] of Object.entries(props)){
+      if (k === "class") e.className = v;
+      else if (k === "text") e.textContent = v;
+      else if (k.startsWith("on")) e.addEventListener(k.slice(2), v);
+      else if (v === true) e.setAttribute(k, "");
+      else if (v !== false && v != null) e.setAttribute(k, v);
+    }
+    for (const c of kids.flat()) if (c != null) e.append(c);
+    return e;
+  }
+  function icon(name){
+    const s = document.createElement("span");
+    s.className = "ico"; s.innerHTML = ICONS[name];
+    return s;
+  }
+  let toastTimer;
+  function toast(msg){
+    const t = $("#toast");
+    t.textContent = msg; t.classList.add("on");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove("on"), 3600);
+  }
+  function parseTags(str){
+    const out = [];
+    for (let t of String(str || "").split(/[,\n]/)){
+      t = t.trim().replace(/^#+/, "").replace(/\s+/g, " ").toLowerCase().slice(0, 24);
+      if (t && !out.includes(t)) out.push(t);
+    }
+    return out;
+  }
+  const baseName = (n) => (n || "image").replace(/\.[^.]+$/, "").slice(0, 80) || "image";
+  const safeName = (n) => (n || "image").replace(/[\\/:*?"<>|]+/g, "-").trim() || "image";
+  const slug = (n) => baseName(n).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "image";
+  const find = (id) => state.items.find((i) => i.id === id);
+  const rawUrl = (it) => `https://raw.githubusercontent.com/${cfg.owner}/${cfg.repo}/${cfg.branch}/images/${it.file}`;
+  const imgUrl = (it) => it._url || "images/" + it.file;
+  function textB64(s){
+    const bytes = new TextEncoder().encode(s); let bin = "";
+    for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+    return btoa(bin);
+  }
+  function b64Text(b){
+    const bin = atob(b.replace(/\s/g, ""));
+    return new TextDecoder().decode(Uint8Array.from(bin, (c) => c.charCodeAt(0)));
+  }
+  function blobB64(blob){
+    return new Promise((res, rej) => {
+      const r = new FileReader();
+      r.onload = () => res(String(r.result).split(",")[1]);
+      r.onerror = () => rej(r.error);
+      r.readAsDataURL(blob);
+    });
+  }
+  async function shrink(file, type, max = 2400){
+    if (type === "image/gif" || type === "image/svg+xml") return file;
+    try {
+      const bmp = await createImageBitmap(file);
+      const s = Math.min(1, max / Math.max(bmp.width, bmp.height));
+      if (s === 1){ if (bmp.close) bmp.close(); return file; }
+      const c = document.createElement("canvas");
+      c.width = Math.round(bmp.width * s); c.height = Math.round(bmp.height * s);
+      c.getContext("2d").drawImage(bmp, 0, 0, c.width, c.height);
+      if (bmp.close) bmp.close();
+      const blob = await new Promise((r) => c.toBlob(r, type, type === "image/png" ? undefined : 0.9));
+      return blob && blob.size < file.size ? blob : file;
+    } catch (e) { return file; }
+  }
+
+  // ---------- GitHub API ----------
+  async function gh(method, path, body){
+    const url = `https://api.github.com/repos/${cfg.owner}/${cfg.repo}` + (path ? "/" + path : "");
+    const headers = {"Accept":"application/vnd.github+json","X-GitHub-Api-Version":"2022-11-28","Authorization":"Bearer " + cfg.token};
+    if (body) headers["Content-Type"] = "application/json";
+    const res = await fetch(url, {method, headers, cache:"no-store", body: body ? JSON.stringify(body) : undefined});
+    let json = null; try { json = await res.json(); } catch (e) {}
+    return {ok: res.ok, status: res.status, json};
+  }
+  const clean = (it) => ({id:it.id, file:it.file, name:it.name, tags:it.tags || [], fav:!!it.fav, createdAt:it.createdAt, size:it.size, type:it.type, sha:it.sha});
+  function norm(items){
+    return (Array.isArray(items) ? items : []).filter((i) => i && typeof i.file === "string").map((i) => Object.assign({tags:[], fav:false}, i))
+      .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  }
+  async function loadLibrary(){
+    if (canEdit){
+      const r = await gh("GET", "contents/library.json?ref=" + encodeURIComponent(cfg.branch));
+      if (r.status === 404){ state.items = []; state.sha = null; return; }
+      if (!r.ok) throw {status: r.status};
+      state.sha = r.json.sha;
+      let text = r.json.content ? b64Text(r.json.content) : await (await fetch(r.json.download_url)).text();
+      state.items = norm(JSON.parse(text).items);
+    } else {
+      const res = await fetch("library.json?t=" + Date.now(), {cache:"no-store"});
+      if (res.status === 404){ state.items = []; return; }
+      if (!res.ok) throw {status: res.status};
+      state.items = norm((await res.json()).items);
+    }
+  }
+  async function refreshSha(){
+    const r = await gh("GET", "contents/library.json?ref=" + encodeURIComponent(cfg.branch));
+    state.sha = r.ok ? r.json.sha : null;
+  }
+  async function putLibrary(retry = true){
+    const body = {message:"Update library", branch:cfg.branch, content:textB64(JSON.stringify({items: state.items.map(clean)}, null, 1))};
+    if (state.sha) body.sha = state.sha;
+    const r = await gh("PUT", "contents/library.json", body);
+    if ((r.status === 409 || r.status === 422) && retry){ await refreshSha(); return putLibrary(false); }
+    if (!r.ok) throw {status: r.status};
+    state.sha = r.json.content.sha;
+  }
+
+  // ---------- saving (batched) ----------
+  let saveTimer, saving = false, again = false;
+  function setSync(s){
+    state.sync = s;
+    const b = $("#sync");
+    b.hidden = !canEdit;
+    b.dataset.s = s;
+    b.textContent = {saved:"All changes saved", pending:"Unsaved changes", saving:"Saving…", error:"Couldn't save. Tap to retry"}[s];
+  }
+  function scheduleSave(){ setSync("pending"); clearTimeout(saveTimer); saveTimer = setTimeout(flushSave, 1200); }
+  async function flushSave(){
+    clearTimeout(saveTimer);
+    if (!canEdit) return;
+    if (saving){ again = true; return; }
+    saving = true; setSync("saving");
+    let ok = true;
+    try { await putLibrary(); } catch (e) {
+      ok = false;
+      toast(e && e.status === 401 ? "GitHub rejected the token. Reconnect in settings." : "Couldn't save to GitHub. Check your connection.");
+    }
+    saving = false;
+    if (again){ again = false; return flushSave(); }
+    setSync(ok ? "saved" : "error");
+  }
+  function patch(id, changes){
+    const i = state.items.findIndex((x) => x.id === id);
+    if (i < 0) return;
+    state.items[i] = Object.assign({}, state.items[i], changes);
+    renderMeta(); renderChips(); renderGrid(); refreshDetail();
+    scheduleSave();
+  }
+  window.addEventListener("beforeunload", (e) => {
+    if (state.sync === "pending" || state.sync === "saving" || state.uploading){ e.preventDefault(); e.returnValue = ""; }
+  });
+
+  // ---------- render ----------
+  function visible(){
+    const tokens = state.q.toLowerCase().split(/\s+/).filter(Boolean);
+    return state.items.filter((it) => {
+      if (state.fav && !it.fav) return false;
+      if (state.tag && !(it.tags || []).includes(state.tag)) return false;
+      const hay = (it.name || "").toLowerCase() + " " + (it.tags || []).join(" ");
+      return tokens.every((t) => hay.includes(t));
+    });
+  }
+  function tagCounts(){
+    const m = new Map();
+    for (const it of state.items) for (const t of it.tags || []) m.set(t, (m.get(t) || 0) + 1);
+    return [...m.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  }
+  function renderMeta(){
+    const n = state.items.length;
+    let text;
+    if (!state.loaded) text = "Loading your library…";
+    else if (state.error) text = "Couldn't load your library";
+    else if (n === 0) text = "Nothing here yet";
+    else text = n + (n === 1 ? " image" : " images");
+    $("#meta").textContent = text;
+  }
+  function renderChips(){
+    const box = $("#chips");
+    const left = box.scrollLeft;
+    const counts = tagCounts();
+    if (state.tag && !counts.some(([t]) => t === state.tag)) state.tag = null;
+    box.replaceChildren(
+      h("button", {class:"chip", type:"button", "aria-pressed": String(!state.tag && !state.fav), text:"All",
+        onclick:() => { state.tag = null; state.fav = false; renderChips(); renderGrid(); }}),
+      h("button", {class:"chip", type:"button", "aria-pressed": String(state.fav),
+        onclick:() => { state.fav = !state.fav; renderChips(); renderGrid(); }}, icon("heart"), "Favorites"),
+      counts.map(([t, n]) => h("button", {class:"chip", type:"button", "aria-pressed": String(state.tag === t),
+        onclick:() => { state.tag = state.tag === t ? null : t; renderChips(); renderGrid(); }}, t, h("small", {text:String(n)})))
+    );
+    box.scrollLeft = left;
+  }
+  function withFallback(img, it){
+    img.addEventListener("error", () => {
+      if (!img.dataset.fb && !it._url){ img.dataset.fb = "1"; img.src = rawUrl(it); }
+      else img.replaceWith(icon("image"));
+    });
+    return img;
+  }
+  function tile(it){
+    const img = withFallback(h("img", {src:imgUrl(it), alt:it.name || "", loading:"lazy", decoding:"async"}), it);
+    const kids = [
+      h("button", {class:"open", type:"button", "aria-label":"Open " + (it.name || "image"), onclick:() => openDetail(it.id)},
+        h("div", {class:"thumb"}, img),
+        h("div", {class:"name", text:it.name || "Untitled"}))
+    ];
+    if (canEdit) kids.push(h("button", {class:"heart", type:"button", "aria-pressed": String(!!it.fav),
+      "aria-label": (it.fav ? "Remove from favorites: " : "Add to favorites: ") + (it.name || "image"),
+      onclick:(e) => { e.stopPropagation(); patch(it.id, {fav: !it.fav}); }}, icon("heart")));
+    return h("div", {class:"tile"}, kids);
+  }
+  function renderGrid(){
+    const grid = $("#grid"), empty = $("#empty");
+    const list = visible();
+    grid.replaceChildren(...list.map(tile));
+    grid.hidden = list.length === 0;
+    if (list.length){ empty.hidden = true; return; }
+    empty.hidden = false;
+    if (!state.loaded){
+      empty.replaceChildren(icon("image"), h("h2", {text:"Loading"}), h("p", {text:"Getting your images ready."}));
+    } else if (state.error){
+      empty.replaceChildren(icon("image"), h("h2", {text:"Library unavailable"}),
+        h("p", {text: canEdit ? "Check your connection or reconnect in settings." : "Make sure Pages is on and this file is named index.html."}),
+        h("button", {class:"btn", type:"button", text:"Open settings", onclick:openSettings}));
+    } else if (state.items.length === 0){
+      if (canEdit) empty.replaceChildren(icon("image"), h("h2", {text:"Your library is empty"}), h("p", {text:"Tap Add images to upload icons and graphics."}));
+      else empty.replaceChildren(icon("image"), h("h2", {text:"Your library is empty"}), h("p", {text:"Connect your GitHub repo to start adding images."}),
+        h("button", {class:"btn", type:"button", text:"Set up uploads", onclick:openSettings}));
+    } else {
+      empty.replaceChildren(icon("search"), h("h2", {text:"No matches"}), h("p", {text:"Try a different word or tag."}),
+        h("button", {class:"btn", type:"button", text:"Clear filters", onclick:() => {
+          state.q = ""; state.tag = null; state.fav = false; $("#q").value = ""; renderChips(); renderGrid();
+        }}));
+    }
+  }
+  function render(){ renderMeta(); renderChips(); renderGrid(); $("#dock").hidden = !canEdit; setSync(state.sync); }
+
+  // ---------- sheets ----------
+  function showSheet(id){
+    $("#backdrop").hidden = false; $(id).hidden = false; document.body.classList.add("lock");
+    const first = $(id).querySelector(".round"); if (first) first.focus({preventScroll:true});
+  }
+  function closeSheets(){
+    if (state.uploading) return;
+    $("#backdrop").hidden = true;
+    for (const s of ["#upload", "#detail", "#settings"]) $(s).hidden = true;
+    document.body.classList.remove("lock");
+    state.openId = null; state.pending = [];
+    previewUrls.forEach((u) => URL.revokeObjectURL(u)); previewUrls = [];
+    resetDelete();
+  }
+
+  // ---------- detail ----------
+  let delArmed = false, delTimer;
+  function resetDelete(){
+    delArmed = false; clearTimeout(delTimer);
+    $("#dDel").replaceChildren(icon("trash"), "Delete");
+  }
+  function openDetail(id){
+    const it = find(id); if (!it) return;
+    state.openId = id;
+    const img = $("#dImg");
+    img.removeAttribute("data-fb");
+    img.onerror = () => { if (!img.dataset.fb && !it._url){ img.dataset.fb = "1"; img.src = rawUrl(it); } };
+    img.src = imgUrl(it); img.alt = it.name || "";
+    $("#dName").value = it.name || "";
+    $("#dName").readOnly = !canEdit;
+    $("#dAddRow").hidden = !canEdit;
+    $("#dFav").hidden = !canEdit;
+    $("#dDel").hidden = !canEdit;
+    $("#dDl").replaceChildren(icon("download"), "Download");
+    resetDelete();
+    refreshDetail();
+    showSheet("#detail");
+  }
+  function refreshDetail(){
+    if (!state.openId) return;
+    const it = find(state.openId);
+    if (!it){ closeSheets(); return; }
+    const name = $("#dName");
+    if (document.activeElement !== name && name.value !== (it.name || "")) name.value = it.name || "";
+    const fav = $("#dFav");
+    fav.setAttribute("aria-pressed", String(!!it.fav));
+    fav.replaceChildren(icon("heart"), it.fav ? "Favorited" : "Favorite");
+    const tags = it.tags || [];
+    $("#dTags").replaceChildren(...(tags.length
+      ? tags.map((t) => h("span", {class:"tag" + (canEdit ? "" : " ro")}, t, canEdit
+          ? h("button", {type:"button", "aria-label":"Remove tag " + t, onclick:() => patch(it.id, {tags: tags.filter((x) => x !== t)})}, icon("close"))
+          : null))
+      : [h("p", {class:"notags", text:"No tags yet"})]));
+  }
+  function addDetailTags(){
+    const it = find(state.openId); if (!it) return;
+    const input = $("#dTagIn");
+    const add = parseTags(input.value);
+    if (!add.length) return;
+    input.value = "";
+    patch(it.id, {tags: [...new Set([...(it.tags || []), ...add])].slice(0, 20)});
+  }
+  async function download(){
+    const it = find(state.openId); if (!it) return;
+    try {
+      let r = await fetch(imgUrl(it));
+      if (!r.ok) r = await fetch(rawUrl(it));
+      if (!r.ok) throw new Error("fetch");
+      const blob = await r.blob();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = safeName(it.name) + "." + (it.file.split(".").pop() || "png");
+      document.body.append(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    } catch (e) { toast("Couldn't download. Press and hold the image to save it."); }
+  }
+  async function remove(){
+    const it = find(state.openId); if (!it || !canEdit) return;
+    if (!delArmed){
+      delArmed = true;
+      $("#dDel").replaceChildren(icon("trash"), "Tap again to delete");
+      delTimer = setTimeout(resetDelete, 4000);
+      return;
+    }
+    clearTimeout(delTimer);
+    state.items = state.items.filter((x) => x.id !== it.id);
+    closeSheets(); render(); toast("Deleted");
+    await flushSave();
+    try {
+      let sha = it.sha;
+      if (!sha){ const r = await gh("GET", "contents/images/" + it.file + "?ref=" + encodeURIComponent(cfg.branch)); sha = r.ok ? r.json.sha : null; }
+      if (sha) await gh("DELETE", "contents/images/" + it.file, {message:"Delete " + it.file, sha, branch:cfg.branch});
+    } catch (e) {}
+  }
+
+  // ---------- upload ----------
+  function normType(f){
+    if (EXT[f.type]) return f.type;
+    const m = /\.([a-z0-9]+)$/i.exec(f.name || "");
+    return m ? (BY_EXT[m[1].toLowerCase()] || null) : null;
+  }
+  function openUpload(list){
+    state.pending = list;
+    const n = list.length;
+    $("#upTitle").textContent = n === 1 ? "Add 1 image" : "Add " + n + " images";
+    $("#upTags").value = "";
+    $("#upStatus").textContent = "";
+    $("#upGo").disabled = false;
+    $("#upGo").replaceChildren(icon("plus"), n === 1 ? "Upload image" : "Upload " + n + " images");
+    previewUrls = list.map((p) => URL.createObjectURL(p.file));
+    $("#upStrip").replaceChildren(...previewUrls.map((u) => h("div", {class:"sm"}, h("img", {src:u, alt:""}))));
+    $("#upSuggest").replaceChildren(...tagCounts().slice(0, 8).map(([t]) => h("button", {class:"chip", type:"button", text:t, onclick:() => {
+      const cur = parseTags($("#upTags").value);
+      if (!cur.includes(t)) cur.push(t);
+      $("#upTags").value = cur.join(", ");
+    }})));
+    showSheet("#upload");
+  }
+  async function doUpload(){
+    if (!canEdit || state.uploading) return;
+    const tags = parseTags($("#upTags").value).slice(0, 20);
+    const doShrink = $("#upShrink").checked;
+    const list = state.pending.slice();
+    const n = list.length;
+    state.uploading = true; $("#upGo").disabled = true; $("#upClose").disabled = true;
+    const added = []; let failed = 0, fatal = null;
+    for (let i = 0; i < n; i++){
+      $("#upStatus").textContent = "Uploading " + (i + 1) + " of " + n + "…";
+      const {file, type} = list[i];
+      try {
+        const blob = doShrink ? await shrink(file, type) : file;
+        const id = Math.random().toString(36).slice(2, 8);
+        const name = slug(file.name) + "-" + id + "." + EXT[type];
+        const r = await gh("PUT", "contents/images/" + name, {message:"Add " + name, branch:cfg.branch, content: await blobB64(blob)});
+        if (!r.ok){
+          if ([401, 403, 404].includes(r.status)){ fatal = r.status; failed += n - i; break; }
+          failed++; continue;
+        }
+        added.push({id, file:name, name:baseName(file.name), tags, fav:false, createdAt:Date.now() + (n - i), size:blob.size, type, sha:r.json.content.sha, _url:URL.createObjectURL(blob)});
+      } catch (e) { failed++; }
+    }
+    state.uploading = false; $("#upClose").disabled = false;
+    if (added.length){
+      state.items = [...added, ...state.items];
+      closeSheets(); render();
+      await flushSave();
+    } else closeSheets();
+    let msg = added.length ? added.length + (added.length === 1 ? " image added" : " images added") : "Nothing was added";
+    if (failed) msg += ". " + failed + (fatal ? " failed: " + (fatal === 404 ? "repo not found, check settings." : "token lacks write access.") : " didn't upload.");
+    toast(msg);
+  }
+
+  // ---------- settings ----------
+  function openSettings(){
+    $("#sOwner").value = cfg.owner; $("#sRepo").value = cfg.repo; $("#sToken").value = "";
+    $("#sToken").placeholder = cfg.token ? "Connected. Paste a new token to replace it" : "github_pat_…";
+    $("#sOut").hidden = !cfg.token;
+    $("#sMsg").textContent = ""; $("#sMsg").className = "formmsg";
+    showSheet("#settings");
+  }
+  function sMsg(t, bad){ const m = $("#sMsg"); m.textContent = t; m.className = "formmsg" + (bad ? " bad" : ""); }
+  async function connect(){
+    const owner = $("#sOwner").value.trim(), repo = $("#sRepo").value.trim();
+    const token = $("#sToken").value.trim() || cfg.token;
+    if (!owner || !repo || !token){ sMsg("Fill in your username, repository and token.", true); return; }
+    const prev = cfg;
+    cfg = Object.assign({}, cfg, {owner, repo, token});
+    $("#sSave").disabled = true; sMsg("Checking…");
+    try {
+      const r = await gh("GET", "");
+      if (r.status === 401){ cfg = prev; sMsg("GitHub rejected that token.", true); }
+      else if (r.status === 404){ cfg = prev; sMsg("Can't find " + owner + "/" + repo + ". Check the spelling and that the token includes this repo.", true); }
+      else if (!r.ok){ cfg = prev; sMsg("GitHub returned an error (" + r.status + "). Try again.", true); }
+      else if (r.json.permissions && r.json.permissions.push === false){ cfg = prev; sMsg("This token can't write. Set Contents to Read and write.", true); }
+      else {
+        cfg.branch = r.json.default_branch || "main";
+        saveCfg(); canEdit = true;
+        closeSheets(); toast("Connected");
+        await start();
+      }
+    } catch (e) { cfg = prev; sMsg("Couldn't reach GitHub. Check your connection.", true); }
+    $("#sSave").disabled = false;
+  }
+  function disconnect(){
+    cfg.token = ""; saveCfg(); canEdit = false;
+    closeSheets(); toast("Disconnected. This device is view-only now.");
+    start();
+  }
+
+  // ---------- wiring ----------
+  $("#searchIco").innerHTML = ICONS.search;
+  $("#addIco").innerHTML = ICONS.plus;
+  $("#gear").replaceChildren(icon("gear"));
+  for (const id of ["#upClose", "#dClose", "#sClose"]) $(id).replaceChildren(icon("close"));
+
+  $("#q").addEventListener("input", (e) => { state.q = e.target.value; renderGrid(); });
+  $("#gear").addEventListener("click", openSettings);
+  $("#sync").addEventListener("click", () => { if (state.sync === "error") flushSave(); });
+  $("#addBtn").addEventListener("click", () => $("#file").click());
+  $("#file").addEventListener("change", (e) => {
+    const files = [...e.target.files]; e.target.value = "";
+    const ok = [], bad = [];
+    for (const f of files){ const type = normType(f); if (type) ok.push({file:f, type}); else bad.push(f); }
+    if (bad.length) toast(bad.length + (bad.length === 1 ? " file skipped." : " files skipped.") + " Use PNG, JPG, GIF, WebP or SVG.");
+    if (ok.length) openUpload(ok);
+  });
+  $("#upGo").addEventListener("click", doUpload);
+  for (const id of ["#upClose", "#dClose", "#sClose", "#backdrop"]) $(id).addEventListener("click", closeSheets);
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeSheets(); });
+  $("#dName").addEventListener("change", (e) => {
+    const it = find(state.openId); if (!it || !canEdit) return;
+    const v = e.target.value.trim().slice(0, 80) || it.name || "Untitled";
+    e.target.value = v;
+    if (v !== it.name) patch(it.id, {name: v});
+  });
+  $("#dTagAdd").addEventListener("click", addDetailTags);
+  $("#dTagIn").addEventListener("keydown", (e) => { if (e.key === "Enter"){ e.preventDefault(); addDetailTags(); } });
+  $("#dFav").addEventListener("click", () => { const it = find(state.openId); if (it) patch(it.id, {fav: !it.fav}); });
+  $("#dDl").addEventListener("click", download);
+  $("#dDel").addEventListener("click", remove);
+  $("#sSave").addEventListener("click", connect);
+  $("#sOut").addEventListener("click", disconnect);
+
+  function banner(msg){ const b = $("#banner"); b.textContent = msg; b.hidden = !msg; }
+
+  async function start(){
+    state.loaded = false; state.error = null; banner(""); render();
+    try {
+      await loadLibrary();
+    } catch (e) {
+      if (canEdit && e && e.status === 401){
+        canEdit = false;
+        banner("GitHub rejected your token. Open settings to reconnect. You're viewing in read-only mode.");
+        try { await loadLibrary(); } catch (e2) { state.error = true; }
+      } else state.error = true;
+    }
+    state.loaded = true;
+    if (!canEdit && !cfg.token && !state.error && state.items.length) banner("View only. Tap the gear to connect uploads on this device.");
+    render();
+  }
+  start();
+})();
+</script>
+</body>
+</html>
