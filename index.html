@@ -818,7 +818,7 @@ details.info code{font-size:14px;color:var(--text)}
       h("button", {class:"chip", type:"button", "aria-pressed": String(!state.tag && !state.fav), text:"All", onclick:reset}),
       h("button", {class:"chip", type:"button", "aria-pressed": String(state.fav),
         onclick:() => { state.fav = !state.fav; render(); }}, icon("heart"), "Favorites"),
-      counts.map(([t, n]) => h("button", {class:"chip", type:"button", "aria-pressed": String(state.tag === t),
+      ...counts.map(([t, n]) => h("button", {class:"chip", type:"button", "aria-pressed": String(state.tag === t),
         onclick:() => { state.tag = state.tag === t ? null : t; render(); }}, t, h("small", {text:String(n)})))
     );
     box.scrollLeft = left;
