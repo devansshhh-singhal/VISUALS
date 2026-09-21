@@ -386,7 +386,7 @@ details.info code{font-size:14px;color:var(--text)}
   <p class="hint">Separate tags with commas. Tap one below to reuse it.</p>
   <div id="upSuggest" class="suggest"></div>
   <label class="check"><input type="checkbox" id="upShrink" checked>Shrink very large photos (recommended)</label>
-  <p class="hint" id="upVidNote" hidden>Videos upload exactly as they are, up to 50 MB each. Larger ones can take a minute.</p>
+  <p class="hint" id="upVidNote" hidden>Videos upload exactly as they are, up to 99 MB each. Larger ones can take a minute.</p>
   <div class="uprow">
     <button class="btn" id="upGo" type="button"></button>
     <span class="status" id="upStatus" role="status"></span>
@@ -513,7 +513,7 @@ details.info code{font-size:14px;color:var(--text)}
   // Same key as before, so a device that is already connected stays connected.
   const LS = "visualsLibrary.v1";
   const CACHE = "visuals-cache-v1";
-  const MAX_IMG = 25 * 1024 * 1024, MAX_VID = 50 * 1024 * 1024;
+  const MAX_IMG = 25 * 1024 * 1024, MAX_VID = 99.5 * 1024 * 1024;
 
   // ---------- config ----------
   function detect(){
@@ -1324,7 +1324,7 @@ details.info code{font-size:14px;color:var(--text)}
         URL.revokeObjectURL(url);
         resolve({dur, thumb: thumb || null});
       };
-      timer = setTimeout(() => finish(null), 10000);
+      timer = setTimeout(() => finish(null), 30000);
       v.onerror = () => finish(null);
       v.onloadedmetadata = () => {
         dur = isFinite(v.duration) ? v.duration : 0;
@@ -1398,6 +1398,7 @@ details.info code{font-size:14px;color:var(--text)}
         const name = slug(file.name) + "-" + id + "." + EXT[type];
         const r = await ghWrite("PUT", "contents/images/" + name, {message:"Add " + name, branch:cfg.branch, content: await blobB64(blob)});
         if (!r.ok){
+          if (r.status === 413 || (r.json && r.json.message && r.json.message.toLowerCase().includes("large"))) { tooBig++; continue; }
           if (r.status === 401 || r.status === 404 || (r.status === 403 && !r.limited)){ fatal = r.status; failed += n - i; break; }
           if (r.limited) slow++;
           failed++; continue;
@@ -1420,7 +1421,7 @@ details.info code{font-size:14px;color:var(--text)}
       flushSave();
     } else closeSheets();
     let msg = added.length ? itemsLabel(added) + " added" + (folder ? " to " + folderName(folder) : "") : "Nothing was added";
-    if (tooBig) msg += ". " + plural(tooBig, "file was", "files were") + " over the size limit (25 MB images, 50 MB videos).";
+    if (tooBig) msg += ". " + plural(tooBig, "file was", "files were") + " over the size limit (25 MB images, 99 MB videos).";
     if (failed) msg += ". " + failed + (fatal ? " failed: " + (fatal === 404 ? "repo not found, check settings." : "token lacks write access.")
       : slow ? " were slowed down by GitHub. Try those again in a minute." : " didn't upload.");
     toast(msg);
@@ -1539,7 +1540,7 @@ details.info code{font-size:14px;color:var(--text)}
   }
   function buildPlayer(slide, it, url){
     slide.dataset.vpath = "images/" + it.file;
-    const v = h("video", {src:url, playsinline:true, preload:"metadata", "aria-label": it.name || "Video"});
+    const v = h("video", {src:url, playsinline:true, "webkit-playsinline":true, preload:"metadata", "aria-label": it.name || "Video"});
     const poster = peek(it, true); if (poster) v.poster = poster;
     const play = h("button", {class:"round", type:"button", "aria-label":"Play"}, icon("play"));
     const seek = h("input", {type:"range", min:"0", max:"1000", step:"1", value:"0", "aria-label":"Seek"});
@@ -1555,7 +1556,12 @@ details.info code{font-size:14px;color:var(--text)}
       time.textContent = fmtTime(v.currentTime) + " / " + fmtTime(d);
     };
     const setIcon = () => { play.replaceChildren(icon(v.paused ? "play" : "pause")); play.setAttribute("aria-label", v.paused ? "Play" : "Pause"); };
-    const toggle = () => { if (v.paused){ const pr = v.play(); if (pr && pr.catch) pr.catch(() => {}); } else v.pause(); };
+    const toggle = () => {
+      if (v.paused){
+        const pr = v.play();
+        if (pr && pr.catch) pr.catch(() => { toast("Ready. Tap play to start."); });
+      } else v.pause();
+    };
     v.addEventListener("click", toggle);
     play.addEventListener("click", toggle);
     for (const ev of ["play", "pause", "ended"]) v.addEventListener(ev, setIcon);
