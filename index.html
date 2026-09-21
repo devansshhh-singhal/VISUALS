@@ -45,7 +45,7 @@ body{
   -webkit-tap-highlight-color:transparent;
 }
 body.lock{overflow:hidden}
-button,input{font:inherit;color:inherit}
+button,input,select{font:inherit;color:inherit}
 button{cursor:pointer}
 a{color:var(--accent);font-weight:700}
 :focus-visible{outline:3px solid var(--accent);outline-offset:3px}
@@ -56,7 +56,13 @@ a{color:var(--accent);font-weight:700}
 
 .app{max-width:860px;margin:0 auto;padding:26px 18px 150px}
 .top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
-h1{margin:0;font-size:32px;font-weight:800;letter-spacing:-.01em}
+.top .round{flex:none}
+.lead{display:flex;align-items:flex-start;gap:14px;min-width:0;flex:1}
+.titles{min-width:0}
+h1{
+  margin:0;font-size:32px;font-weight:800;letter-spacing:-.01em;overflow-wrap:anywhere;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+}
 header p{margin:4px 0 0;font-size:15px}
 .sync{border:0;background:none;padding:0;font-weight:700;font-size:14px;color:var(--muted);margin-top:2px}
 .sync[data-s="error"]{color:var(--danger);text-decoration:underline}
@@ -72,7 +78,12 @@ header p{margin:4px 0 0;font-size:15px}
 .search input::placeholder{color:var(--muted);opacity:1}
 .search input::-webkit-search-cancel-button{-webkit-appearance:none}
 
-.chips{display:flex;gap:14px;overflow-x:auto;padding:12px 6px 20px;margin:0 -6px;scrollbar-width:none}
+.secthead{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:18px 4px 4px;min-height:44px}
+.secthead h2{margin:0;font-size:19px;font-weight:800}
+.textbtn{border:0;background:none;min-height:44px;padding:0 8px;font-weight:800;font-size:15px;color:var(--accent);border-radius:12px}
+.hintline{margin:0 4px 8px;font-size:15px;color:var(--muted)}
+
+.chips{display:flex;gap:14px;overflow-x:auto;padding:12px 6px 14px;margin:0 -6px;scrollbar-width:none}
 .chips::-webkit-scrollbar{display:none}
 .chip{
   flex:none;min-height:42px;padding:0 18px;border:0;border-radius:999px;background:var(--bg);
@@ -86,10 +97,20 @@ header p{margin:4px 0 0;font-size:15px}
 @media (min-width:560px){.grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media (min-width:820px){.grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
 .tile{position:relative;border-radius:24px;background:var(--bg);box-shadow:var(--raise)}
+.tile.sel{outline:3px solid var(--accent);outline-offset:3px}
 .tile .open{display:block;width:100%;border:0;background:none;padding:10px 10px 12px;text-align:left;border-radius:24px}
 .thumb{aspect-ratio:1;border-radius:16px;box-shadow:var(--inset);display:grid;place-items:center;padding:12px;overflow:hidden;color:var(--muted)}
 .thumb img{max-width:100%;max-height:100%;object-fit:contain;display:block}
 .tile .name{margin:10px 6px 0;font-weight:700;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tile .sub{margin:1px 6px 0;font-weight:700;font-size:13px;color:var(--muted);display:flex;align-items:center;gap:5px;white-space:nowrap;overflow:hidden}
+.tile .sub span:last-child{overflow:hidden;text-overflow:ellipsis}
+.tile .sub .ico svg{width:14px;height:14px}
+.thumb.none .ico svg{width:46px;height:46px}
+.mosaic{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;place-items:stretch;gap:6px;padding:8px}
+.mosaic.n1{grid-template-columns:1fr;grid-template-rows:1fr;padding:12px}
+.mosaic.n2{grid-template-rows:1fr}
+.mosaic .cell{min-width:0;min-height:0;display:grid;place-items:center;overflow:hidden;border-radius:10px}
+.mosaic .cell img{max-width:100%;max-height:100%;object-fit:contain}
 .heart{
   position:absolute;top:16px;right:16px;width:44px;height:44px;border:0;border-radius:50%;
   background:var(--bg);box-shadow:var(--raise-sm);color:var(--muted);display:grid;place-items:center;padding:0;
@@ -97,12 +118,18 @@ header p{margin:4px 0 0;font-size:15px}
 .heart[aria-pressed="true"]{color:var(--heart);box-shadow:var(--inset)}
 .heart[aria-pressed="true"] .ico svg{fill:currentColor}
 .heart .ico svg{width:20px;height:20px}
+.pick{
+  position:absolute;top:16px;right:16px;width:38px;height:38px;border-radius:50%;background:var(--bg);
+  box-shadow:var(--inset);display:grid;place-items:center;color:transparent;pointer-events:none;
+}
+.pick.on{background:var(--accent);color:var(--accent-ink);box-shadow:none}
+.pick .ico svg{width:20px;height:20px;stroke-width:3}
 
 .empty{margin:36px auto 0;max-width:340px;text-align:center;padding:30px 24px;border-radius:28px;box-shadow:var(--inset);color:var(--muted)}
 .empty .ico svg{width:44px;height:44px}
 .empty h2{margin:14px 0 6px;font-size:20px;color:var(--text)}
 .empty p{margin:0 0 4px}
-.empty .btn{margin-top:16px}
+.emptyrow{display:flex;flex-wrap:wrap;justify-content:center;gap:14px;margin-top:18px}
 
 .btn{
   min-height:48px;padding:0 22px;border:0;border-radius:999px;background:var(--bg);color:var(--accent);
@@ -110,7 +137,7 @@ header p{margin:4px 0 0;font-size:15px}
   box-shadow:var(--raise-sm);
 }
 .btn:active,.btn[aria-pressed="true"]{box-shadow:var(--inset)}
-.btn[disabled]{opacity:.6;pointer-events:none}
+.btn[disabled]{opacity:.55;pointer-events:none}
 .btn.danger{color:var(--danger)}
 .btn.small{min-height:44px;padding:0 18px}
 .btn .ico svg{width:20px;height:20px}
@@ -128,14 +155,17 @@ header p{margin:4px 0 0;font-size:15px}
   display:inline-flex;align-items:center;gap:10px;box-shadow:var(--raise);
 }
 .cta:active{box-shadow:inset 3px 3px 8px rgba(0,0,0,.28)}
+.bar{pointer-events:auto;display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
 
 .backdrop{position:fixed;inset:0;background:var(--scrim);z-index:20}
+.backdrop.top{z-index:35}
 .sheet{
   position:fixed;left:0;right:0;bottom:0;z-index:30;margin:0 auto;max-width:640px;max-height:92%;overflow-y:auto;
   background:var(--bg);border-radius:30px 30px 0 0;box-shadow:0 -10px 34px var(--sd);
   padding:20px 22px calc(26px + env(safe-area-inset-bottom,0px));
   animation:rise .22s ease-out;
 }
+.sheet.top{z-index:36}
 @keyframes rise{from{transform:translateY(40px);opacity:0}to{transform:none;opacity:1}}
 @media (prefers-reduced-motion:reduce){.sheet{animation:none}.toast{transition:none}}
 .sheethead{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
@@ -146,9 +176,12 @@ header p{margin:4px 0 0;font-size:15px}
 .preview img{max-width:100%;max-height:100%;object-fit:contain}
 .field{display:block;margin-top:20px}
 .lbl{display:block;margin:0 4px 8px;font-weight:700;font-size:15px;color:var(--muted)}
-.field input[type="text"],.field input[type="password"],.addrow input{
+.field input[type="text"],.field input[type="password"],.field select,.addrow input{
   width:100%;height:50px;border:0;border-radius:16px;background:var(--bg);box-shadow:var(--inset);padding:0 16px;font-size:16px;
 }
+.field select{appearance:none;-webkit-appearance:none;padding-right:46px;text-overflow:ellipsis}
+.selwrap{position:relative;display:block}
+.selwrap .ico{position:absolute;right:16px;top:50%;transform:translateY(-50%);pointer-events:none;color:var(--muted)}
 .addrow{display:flex;gap:12px;align-items:center;margin-top:12px}
 .taglist{display:flex;flex-wrap:wrap;gap:10px}
 .tag{display:inline-flex;align-items:center;gap:2px;min-height:38px;padding:0 4px 0 14px;border-radius:999px;box-shadow:var(--raise-sm);font-weight:700;font-size:14px}
@@ -171,10 +204,27 @@ header p{margin:4px 0 0;font-size:15px}
 .steps li{margin:0 0 10px}
 .formmsg{margin:14px 4px 0;font-weight:700;font-size:15px;min-height:1.4em}
 .formmsg.bad{color:var(--danger)}
+.picklist{display:grid;gap:14px;padding:6px 4px 4px}
+.row{
+  width:100%;min-height:56px;padding:0 18px;border:0;border-radius:18px;background:var(--bg);box-shadow:var(--raise-sm);
+  display:flex;align-items:center;gap:14px;font-weight:700;font-size:16px;text-align:left;
+}
+.row:active,.row[aria-pressed="true"]{box-shadow:var(--inset)}
+.row .rl{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row small{font-size:13px;font-weight:700;color:var(--muted)}
+.row .ico{color:var(--muted)}
+.row[aria-pressed="true"] .ico{color:var(--accent)}
+details.info{margin:18px 4px 0;font-size:15px}
+details.info summary{cursor:pointer;font-weight:800;min-height:44px;display:flex;align-items:center}
+details.info p{margin:0 0 10px;color:var(--muted)}
+details.info code{font-size:14px;color:var(--text)}
+
+.drop{position:fixed;inset:0;z-index:50;display:grid;place-items:center;background:var(--scrim);pointer-events:none}
+.drop div{padding:28px 36px;border-radius:28px;background:var(--bg);box-shadow:var(--raise);font-weight:800;font-size:20px;text-align:center}
 
 .toast{
   position:fixed;left:50%;bottom:calc(96px + env(safe-area-inset-bottom,0px));transform:translate(-50%,12px);
-  z-index:40;max-width:min(88vw,420px);padding:12px 20px;border-radius:18px;background:var(--bg);color:var(--text);
+  z-index:60;max-width:min(88vw,420px);padding:12px 20px;border-radius:18px;background:var(--bg);color:var(--text);
   box-shadow:var(--raise);font-weight:700;font-size:15px;text-align:center;opacity:0;pointer-events:none;
   transition:opacity .2s,transform .2s;
 }
@@ -185,12 +235,16 @@ header p{margin:4px 0 0;font-size:15px}
 <main class="app">
   <header>
     <div class="top">
-      <div>
-        <h1>My Visuals</h1>
-        <p id="meta" class="muted">Loading your library…</p>
-        <button id="sync" class="sync" type="button" hidden></button>
+      <div class="lead">
+        <button class="round" id="back" type="button" aria-label="Back to all images" hidden></button>
+        <div class="titles">
+          <h1 id="title">My Visuals</h1>
+          <p id="meta" class="muted" role="status">Loading your library…</p>
+          <button id="sync" class="sync" type="button" hidden></button>
+        </div>
       </div>
       <button class="round" id="gear" type="button" aria-label="Settings"></button>
+      <button class="round" id="editFolder" type="button" aria-label="Rename or delete this folder" hidden></button>
     </div>
   </header>
 
@@ -199,20 +253,44 @@ header p{margin:4px 0 0;font-size:15px}
   <label class="search">
     <span class="sr">Search your visuals</span>
     <span class="ico" id="searchIco"></span>
-    <input id="q" type="search" placeholder="Search by name or tag" autocomplete="off" enterkeyhint="search">
+    <input id="q" type="search" placeholder="Search by name, tag or folder" autocomplete="off" enterkeyhint="search">
   </label>
 
+  <section id="foldersSec" hidden>
+    <div class="secthead">
+      <h2>Folders</h2>
+      <button class="btn small" id="newFolder" type="button"></button>
+    </div>
+    <p id="folderHint" class="hintline" hidden>Make a folder, then move images into it to keep them apart.</p>
+    <div id="folderGrid" class="grid"></div>
+  </section>
+
   <div id="chips" class="chips" role="group" aria-label="Filter by tag"></div>
-  <section id="grid" class="grid" aria-live="polite"></section>
+
+  <section id="imagesSec" hidden>
+    <div class="secthead">
+      <h2 id="imagesTitle">Images</h2>
+      <button class="textbtn" id="selectBtn" type="button">Select</button>
+    </div>
+    <div id="grid" class="grid"></div>
+  </section>
+
   <div id="empty" class="empty" hidden></div>
 </main>
 
 <div class="dock" id="dock" hidden>
   <button class="cta" id="addBtn" type="button"><span class="ico" id="addIco"></span>Add images</button>
+  <div class="bar" id="selBar" hidden>
+    <button class="btn" id="bMove" type="button"></button>
+    <button class="btn danger" id="bDel" type="button"></button>
+    <button class="btn" id="bDone" type="button">Cancel</button>
+  </div>
   <input id="file" type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml,.svg" multiple hidden>
 </div>
 
 <div id="backdrop" class="backdrop" hidden></div>
+<div id="backdrop2" class="backdrop top" hidden></div>
+<div id="drop" class="drop" hidden><div>Drop images to add them</div></div>
 
 <section id="upload" class="sheet" role="dialog" aria-modal="true" aria-labelledby="upTitle" hidden>
   <div class="sheethead">
@@ -221,6 +299,10 @@ header p{margin:4px 0 0;font-size:15px}
   </div>
   <div id="upStrip" class="strip"></div>
   <label class="field" style="margin-top:6px">
+    <span class="lbl">Folder</span>
+    <span class="selwrap"><select id="upFolder"></select></span>
+  </label>
+  <label class="field">
     <span class="lbl">Tags for all of these (optional)</span>
     <input id="upTags" type="text" placeholder="cat, line, pastel" autocomplete="off" enterkeyhint="done">
   </label>
@@ -243,6 +325,10 @@ header p{margin:4px 0 0;font-size:15px}
     <span class="lbl">Name</span>
     <input id="dName" type="text" maxlength="80" autocomplete="off" enterkeyhint="done">
   </label>
+  <label class="field" id="dFolderRow">
+    <span class="lbl">Folder</span>
+    <span class="selwrap"><select id="dFolder"></select></span>
+  </label>
   <div class="field">
     <span class="lbl">Tags</span>
     <div id="dTags" class="taglist"></div>
@@ -264,9 +350,10 @@ header p{margin:4px 0 0;font-size:15px}
     <button class="round" id="sClose" type="button" aria-label="Close"></button>
   </div>
   <p class="hint" style="margin:0 4px 14px">Your images live in a <b>private</b> repo. Only a device with your token can see or change them.</p>
+  <p id="sStatus" class="hint" style="margin:0 4px 14px;font-weight:800;color:var(--text)" hidden></p>
   <ol class="steps">
-    <li>Create a <b>private</b> repo for your data, e.g. <b>visuals-data</b>. Leave it empty.</li>
-    <li><a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">Create a token</a>. Pick <b>Only select repositories</b>, choose the private repo, and set <b>Contents</b> to <b>Read and write</b>.</li>
+    <li>On GitHub, create a <b>private</b> repo for your data, e.g. <b>visuals-data</b>. Tick <b>Add a README file</b> so it isn't empty.</li>
+    <li><a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">Create a token</a>. Pick <b>Only select repositories</b>, choose that private repo, and set <b>Contents</b> to <b>Read and write</b>.</li>
     <li>Paste your details below.</li>
   </ol>
   <label class="field" style="margin-top:12px"><span class="lbl">GitHub username</span>
@@ -281,6 +368,37 @@ header p{margin:4px 0 0;font-size:15px}
     <button class="btn" id="sSave" type="button">Save and connect</button>
     <button class="btn danger" id="sOut" type="button">Disconnect this device</button>
   </div>
+  <details class="info">
+    <summary>Where do my images go?</summary>
+    <p>Into your private repo, never the public one. Every image is saved as a commit there.</p>
+    <p><code>images/</code> holds the full-size files. <code>thumbs/</code> holds small previews so the grid loads fast. <code>library.json</code> holds names, tags, favorites and folders.</p>
+    <p>Folders exist only in <code>library.json</code>, so moving an image between folders is instant and never re-uploads it.</p>
+  </details>
+</section>
+
+<section id="folderSheet" class="sheet top" role="dialog" aria-modal="true" aria-labelledby="fTitle" hidden>
+  <div class="sheethead">
+    <h2 id="fTitle">New folder</h2>
+    <button class="round" id="fClose" type="button" aria-label="Close"></button>
+  </div>
+  <label class="field" style="margin-top:6px">
+    <span class="lbl">Folder name</span>
+    <input id="fName" type="text" maxlength="40" autocomplete="off" enterkeyhint="done" placeholder="e.g. Cats">
+  </label>
+  <div id="fMsg" class="formmsg" role="status"></div>
+  <div class="actions" style="margin-top:14px">
+    <button class="btn" id="fSave" type="button">Create folder</button>
+    <button class="btn danger" id="fDel" type="button" hidden></button>
+  </div>
+  <p id="fNote" class="hint" hidden>Deleting a folder never deletes its images. They move to Unfiled.</p>
+</section>
+
+<section id="moveSheet" class="sheet top" role="dialog" aria-modal="true" aria-labelledby="mTitle" hidden>
+  <div class="sheethead">
+    <h2 id="mTitle">Move to</h2>
+    <button class="round" id="mClose" type="button" aria-label="Close"></button>
+  </div>
+  <div id="mList" class="picklist"></div>
 </section>
 
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
@@ -297,11 +415,20 @@ header p{margin:4px 0 0;font-size:15px}
     download:`<svg viewBox="0 0 24 24" ${P}><path d="M12 4v11M7 11l5 5 5-5M5 20h14"/></svg>`,
     trash:`<svg viewBox="0 0 24 24" ${P}><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6"/></svg>`,
     image:`<svg viewBox="0 0 24 24" ${P}><rect x="3" y="4" width="18" height="16" rx="4"/><circle cx="9" cy="10" r="1.6"/><path d="M4 18l5-5 4 4 3-3 4 4"/></svg>`,
-    gear:`<svg viewBox="0 0 24 24" ${P}><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/></svg>`
+    gear:`<svg viewBox="0 0 24 24" ${P}><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/></svg>`,
+    folder:`<svg viewBox="0 0 24 24" ${P}><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>`,
+    folderplus:`<svg viewBox="0 0 24 24" ${P}><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M12 10.5v5M9.5 13h5"/></svg>`,
+    back:`<svg viewBox="0 0 24 24" ${P}><path d="M15 5l-7 7 7 7"/></svg>`,
+    check:`<svg viewBox="0 0 24 24" ${P}><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>`,
+    pencil:`<svg viewBox="0 0 24 24" ${P}><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg>`,
+    chev:`<svg viewBox="0 0 24 24" ${P}><path d="M6 9l6 6 6-6"/></svg>`
   };
   const EXT = {"image/png":"png","image/jpeg":"jpg","image/gif":"gif","image/webp":"webp","image/svg+xml":"svg"};
   const BY_EXT = {png:"image/png",jpg:"image/jpeg",jpeg:"image/jpeg",gif:"image/gif",webp:"image/webp",svg:"image/svg+xml"};
+  // Same key as before, so a device that is already connected stays connected.
   const LS = "visualsLibrary.v1";
+  const CACHE = "visuals-cache-v1";
+  const MAX_BYTES = 25 * 1024 * 1024;
 
   // ---------- config ----------
   function detect(){
@@ -318,8 +445,14 @@ header p{margin:4px 0 0;font-size:15px}
   let cfg = loadCfg();
   let canEdit = !!(cfg.token && cfg.owner && cfg.repo);
 
-  const state = {items:[], tag:null, fav:false, q:"", loaded:false, error:null, openId:null, pending:[], uploading:false, sha:null, sync:"saved"};
+  const state = {
+    items:[], folders:[], folder:null, tag:null, fav:false, q:"", loaded:false, error:null,
+    openId:null, pending:[], uploading:false, sha:null, sync:"saved", select:false, sel:new Set()
+  };
+  const deleted = {items:new Set(), folders:new Set()};   // remembered so a merge can't bring them back
+  const pendingDel = [];                                   // repo files waiting to be removed after a good save
   let previewUrls = [];
+  let folderCtx = null;
 
   // ---------- helpers ----------
   function h(tag, props = {}, ...kids){
@@ -344,7 +477,7 @@ header p{margin:4px 0 0;font-size:15px}
     const t = $("#toast");
     t.textContent = msg; t.classList.add("on");
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => t.classList.remove("on"), 3600);
+    toastTimer = setTimeout(() => t.classList.remove("on"), 3800);
   }
   function parseTags(str){
     const out = [];
@@ -354,11 +487,37 @@ header p{margin:4px 0 0;font-size:15px}
     }
     return out;
   }
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const uid = () => Math.random().toString(36).slice(2, 10);
+  const plural = (n, one, many) => n + " " + (n === 1 ? one : many);
   const baseName = (n) => (n || "image").replace(/\.[^.]+$/, "").slice(0, 80) || "image";
   const safeName = (n) => (n || "image").replace(/[\\/:*?"<>|]+/g, "-").trim() || "image";
   const slug = (n) => baseName(n).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "image";
+  const enc = encodeURIComponent;
   const find = (id) => state.items.find((i) => i.id === id);
   const mimeOf = (path) => BY_EXT[(path.split(".").pop() || "").toLowerCase()] || "application/octet-stream";
+  const byName = (a, b) => a.name.localeCompare(b.name, undefined, {numeric:true, sensitivity:"base"});
+  const sortFolders = () => state.folders.sort(byName);
+  const findFolder = (id) => id ? state.folders.find((f) => f.id === id) || null : null;
+  const folderName = (id) => { const f = findFolder(id); return f ? f.name : ""; };
+  const countIn = (id) => state.items.reduce((n, i) => n + ((i.folder || null) === id ? 1 : 0), 0);
+  const isFiltering = () => !!(state.q.trim() || state.tag || state.fav);
+
+  // ---------- image loading (with a cache that survives reloads) ----------
+  const cacheKey = (path) => "https://visuals.local/" + enc(cfg.owner + "/" + cfg.repo) + "/" + path;
+  async function cacheGet(path){
+    try {
+      if (!window.caches) return null;
+      const r = await (await caches.open(CACHE)).match(cacheKey(path));
+      return r ? new Blob([await r.blob()], {type: mimeOf(path)}) : null;
+    } catch (e) { return null; }
+  }
+  async function cachePut(path, blob){
+    try {
+      if (!window.caches || blob.size > 2 * 1024 * 1024) return;
+      await (await caches.open(CACHE)).put(cacheKey(path), new Response(blob));
+    } catch (e) {}
+  }
   const urlCache = new Map();
   let active = 0; const waiting = [];
   function pump(){
@@ -368,21 +527,27 @@ header p{margin:4px 0 0;font-size:15px}
     }
   }
   function queue(fn){ return new Promise((res, rej) => { waiting.push(() => fn().then(res, rej)); pump(); }); }
+  const pathFor = (it, thumb) => thumb && it.thumb ? "thumbs/" + it.thumb : "images/" + it.file;
+  const peek = (it, thumb) => it._url || urlCache.get(pathFor(it, thumb)) || null;
   function fetchBlobUrl(path){
     if (urlCache.has(path)) return Promise.resolve(urlCache.get(path));
     return queue(async () => {
       if (urlCache.has(path)) return urlCache.get(path);
-      const res = await fetch(`https://api.github.com/repos/${cfg.owner}/${cfg.repo}/contents/${path}?ref=${encodeURIComponent(cfg.branch)}`,
-        {headers:{"Accept":"application/vnd.github.raw+json","X-GitHub-Api-Version":"2022-11-28","Authorization":"Bearer " + cfg.token}});
-      if (!res.ok) throw new Error("status " + res.status);
-      const url = URL.createObjectURL(new Blob([await res.arrayBuffer()], {type: mimeOf(path)}));
+      let blob = await cacheGet(path);
+      if (!blob){
+        const res = await fetch(`https://api.github.com/repos/${cfg.owner}/${cfg.repo}/contents/${path}?ref=${enc(cfg.branch)}`,
+          {headers:{"Accept":"application/vnd.github.raw+json","X-GitHub-Api-Version":"2022-11-28","Authorization":"Bearer " + cfg.token}});
+        if (!res.ok) throw new Error("status " + res.status);
+        blob = new Blob([await res.arrayBuffer()], {type: mimeOf(path)});
+        cachePut(path, blob);
+      }
+      const url = URL.createObjectURL(blob);
       urlCache.set(path, url);
       return url;
     });
   }
   function getUrl(it, thumb){
-    if (it._url) return Promise.resolve(it._url);
-    return fetchBlobUrl(thumb && it.thumb ? "thumbs/" + it.thumb : "images/" + it.file);
+    return it._url ? Promise.resolve(it._url) : fetchBlobUrl(pathFor(it, thumb));
   }
   const io = "IntersectionObserver" in window
     ? new IntersectionObserver((entries) => {
@@ -391,6 +556,8 @@ header p{margin:4px 0 0;font-size:15px}
     : null;
   function lazyImg(it, alt){
     const img = h("img", {alt, decoding:"async"});
+    const now = peek(it, true);
+    if (now){ img.src = now; return img; }   // already have it: no blank flash when the grid redraws
     img._load = () => getUrl(it, true).then((u) => { img.src = u; }, () => { img.replaceWith(icon("image")); });
     if (io) io.observe(img); else img._load();
     return img;
@@ -434,42 +601,80 @@ header p{margin:4px 0 0;font-size:15px}
     if (body) headers["Content-Type"] = "application/json";
     const res = await fetch(url, {method, headers, cache:"no-store", body: body ? JSON.stringify(body) : undefined});
     let json = null; try { json = await res.json(); } catch (e) {}
-    return {ok: res.ok, status: res.status, json};
+    return {ok: res.ok, status: res.status, json, headers: res.headers};
   }
-  const clean = (it) => ({id:it.id, file:it.file, name:it.name, tags:it.tags || [], fav:!!it.fav, createdAt:it.createdAt, size:it.size, type:it.type, sha:it.sha, thumb:it.thumb});
-  function norm(items){
-    return (Array.isArray(items) ? items : []).filter((i) => i && typeof i.file === "string").map((i) => Object.assign({tags:[], fav:false}, i))
+  // Writes wait and retry when GitHub says "slow down", instead of failing the whole batch.
+  async function ghWrite(method, path, body){
+    for (let attempt = 0; ; attempt++){
+      const r = await gh(method, path, body);
+      const msg = String((r.json && r.json.message) || "").toLowerCase();
+      const ra = r.headers && r.headers.get ? r.headers.get("retry-after") : null;
+      r.limited = r.status === 429 || (r.status === 403 && (/rate limit|abuse|secondary/.test(msg) || !!ra));
+      if (!r.limited || attempt >= 3) return r;
+      await sleep(Math.min(60, Number(ra) || 5 * (attempt + 1)) * 1000);
+    }
+  }
+  const clean = (it) => ({id:it.id, file:it.file, name:it.name, tags:it.tags || [], fav:!!it.fav, folder:it.folder || null,
+    createdAt:it.createdAt, size:it.size, type:it.type, sha:it.sha, thumb:it.thumb});
+  function norm(data){
+    const d = data && typeof data === "object" ? data : {};
+    const folders = (Array.isArray(d.folders) ? d.folders : [])
+      .filter((f) => f && typeof f.id === "string" && typeof f.name === "string" && f.name.trim())
+      .map((f) => ({id:f.id, name:f.name.trim().slice(0, 40), createdAt:f.createdAt || 0}));
+    const ids = new Set(folders.map((f) => f.id));
+    const items = (Array.isArray(d.items) ? d.items : []).filter((i) => i && typeof i.file === "string")
+      .map((i) => Object.assign({tags:[], fav:false}, i, {folder: ids.has(i.folder) ? i.folder : null}))
       .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    folders.sort(byName);
+    return {folders, items};
   }
-  async function loadLibrary(){
-    const r = await gh("GET", "contents/library.json?ref=" + encodeURIComponent(cfg.branch));
-    if (r.status === 404){ state.items = []; state.sha = null; return; }
+  async function fetchLibrary(){
+    const r = await gh("GET", "contents/library.json?ref=" + enc(cfg.branch));
+    if (r.status === 404) return {sha:null, data:{}};
     if (!r.ok) throw {status: r.status};
-    state.sha = r.json.sha;
     let text;
     if (r.json.content) text = b64Text(r.json.content);
     else {
-      const raw = await fetch(`https://api.github.com/repos/${cfg.owner}/${cfg.repo}/contents/library.json?ref=${encodeURIComponent(cfg.branch)}`,
+      const raw = await fetch(`https://api.github.com/repos/${cfg.owner}/${cfg.repo}/contents/library.json?ref=${enc(cfg.branch)}`,
         {headers:{"Accept":"application/vnd.github.raw+json","Authorization":"Bearer " + cfg.token}});
       text = await raw.text();
     }
-    state.items = norm(JSON.parse(text).items);
+    return {sha:r.json.sha, data:JSON.parse(text)};
   }
-  async function refreshSha(){
-    const r = await gh("GET", "contents/library.json?ref=" + encodeURIComponent(cfg.branch));
-    state.sha = r.ok ? r.json.sha : null;
+  async function loadLibrary(){
+    const {sha, data} = await fetchLibrary();
+    const n = norm(data);
+    state.sha = sha; state.items = n.items; state.folders = n.folders;
+  }
+  // Another device saved first: keep what it added, keep our own edits.
+  function mergeRemote(remote){
+    const haveF = new Set(state.folders.map((f) => f.id));
+    for (const f of remote.folders) if (!haveF.has(f.id) && !deleted.folders.has(f.id)) state.folders.push(f);
+    const haveI = new Set(state.items.map((i) => i.id));
+    for (const i of remote.items) if (!haveI.has(i.id) && !deleted.items.has(i.id)) state.items.push(i);
+    state.items.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    sortFolders();
+    const ids = new Set(state.folders.map((f) => f.id));
+    state.items = state.items.map((i) => i.folder && !ids.has(i.folder) ? Object.assign({}, i, {folder:null}) : i);
   }
   async function putLibrary(retry = true){
-    const body = {message:"Update library", branch:cfg.branch, content:textB64(JSON.stringify({items: state.items.map(clean)}, null, 1))};
+    const payload = {version:2, folders:state.folders, items:state.items.map(clean)};
+    const body = {message:"Update library", branch:cfg.branch, content:textB64(JSON.stringify(payload, null, 1))};
     if (state.sha) body.sha = state.sha;
-    const r = await gh("PUT", "contents/library.json", body);
-    if ((r.status === 409 || r.status === 422) && retry){ await refreshSha(); return putLibrary(false); }
+    const r = await ghWrite("PUT", "contents/library.json", body);
+    if ((r.status === 409 || r.status === 422) && retry){
+      const remote = await fetchLibrary();
+      state.sha = remote.sha;
+      mergeRemote(norm(remote.data));
+      render();
+      return putLibrary(false);
+    }
     if (!r.ok) throw {status: r.status};
     state.sha = r.json.content.sha;
   }
 
   // ---------- saving (batched) ----------
-  let saveTimer, saving = false, again = false;
+  let saveTimer, saving = false, again = false, draining = false;
   function setSync(s){
     state.sync = s;
     const b = $("#sync");
@@ -491,109 +696,351 @@ header p{margin:4px 0 0;font-size:15px}
     saving = false;
     if (again){ again = false; return flushSave(); }
     setSync(ok ? "saved" : "error");
+    if (ok) drainDeletes();
+  }
+  async function delFile(path, known){
+    try {
+      let sha = known;
+      if (!sha){
+        const r = await gh("GET", path + "?ref=" + enc(cfg.branch));
+        if (r.status === 404) return true;
+        sha = r.ok ? r.json.sha : null;
+      }
+      if (!sha) return false;
+      const r = await ghWrite("DELETE", path, {message:"Delete " + path, sha, branch:cfg.branch});
+      return r.ok || r.status === 404;
+    } catch (e) { return false; }
+  }
+  // Files are removed from the repo only after the library no longer points at them.
+  async function drainDeletes(){
+    if (draining) return;
+    draining = true; let failed = 0;
+    while (pendingDel.length){
+      const d = pendingDel[0];
+      if (!(await delFile(d.path, d.sha))) failed++;
+      pendingDel.shift();
+    }
+    draining = false;
+    if (failed) toast(plural(failed, "file", "files") + " couldn't be removed from the repo. They're no longer in your library.");
   }
   function patch(id, changes){
     const i = state.items.findIndex((x) => x.id === id);
     if (i < 0) return;
     state.items[i] = Object.assign({}, state.items[i], changes);
-    renderMeta(); renderChips(); renderGrid(); refreshDetail();
+    render(); refreshDetail();
     scheduleSave();
   }
+  function moveItems(ids, folderId){
+    const set = new Set(ids), to = folderId || null; let n = 0;
+    state.items = state.items.map((i) => {
+      if (set.has(i.id) && (i.folder || null) !== to){ n++; return Object.assign({}, i, {folder: to}); }
+      return i;
+    });
+    if (n){ render(); refreshDetail(); scheduleSave(); }
+    return n;
+  }
   window.addEventListener("beforeunload", (e) => {
-    if (state.sync === "pending" || state.sync === "saving" || state.uploading){ e.preventDefault(); e.returnValue = ""; }
+    if (state.sync === "pending" || state.sync === "saving" || state.uploading || pendingDel.length){ e.preventDefault(); e.returnValue = ""; }
   });
+
+  // ---------- navigation ----------
+  function applyRoute(){
+    const m = /^#f=([a-z0-9]+)$/i.exec(location.hash);
+    const id = m && findFolder(m[1]) ? m[1] : null;
+    if (id !== state.folder){
+      state.tag = null; state.fav = false; state.q = ""; $("#q").value = "";
+      exitSelect();
+    }
+    state.folder = id;
+  }
+  function navigate(id){
+    if ((id || null) === state.folder) return;
+    try { history.pushState(null, "", id ? "#f=" + id : location.pathname + location.search); } catch (e) {}
+    applyRoute(); render(); window.scrollTo(0, 0);
+  }
+  window.addEventListener("popstate", () => { applyRoute(); render(); });
 
   // ---------- render ----------
   function visible(){
     const tokens = state.q.toLowerCase().split(/\s+/).filter(Boolean);
+    const filtering = isFiltering();
     return state.items.filter((it) => {
+      if (state.folder){ if (it.folder !== state.folder) return false; }
+      else if (!filtering && it.folder) return false;
       if (state.fav && !it.fav) return false;
       if (state.tag && !(it.tags || []).includes(state.tag)) return false;
-      const hay = (it.name || "").toLowerCase() + " " + (it.tags || []).join(" ");
+      const hay = ((it.name || "") + " " + (it.tags || []).join(" ") + " " + folderName(it.folder)).toLowerCase();
       return tokens.every((t) => hay.includes(t));
     });
   }
-  function tagCounts(){
+  function scopeItems(){ return state.folder ? state.items.filter((i) => i.folder === state.folder) : state.items; }
+  function tagCounts(list = scopeItems()){
     const m = new Map();
-    for (const it of state.items) for (const t of it.tags || []) m.set(t, (m.get(t) || 0) + 1);
+    for (const it of list) for (const t of it.tags || []) m.set(t, (m.get(t) || 0) + 1);
     return [...m.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
   }
-  function renderMeta(){
-    const n = state.items.length;
+  function renderHeader(){
+    const f = findFolder(state.folder);
+    $("#back").hidden = !f;
+    $("#gear").hidden = !!f;
+    $("#editFolder").hidden = !(f && canEdit);
+    $("#title").textContent = f ? f.name : "My Visuals";
+    document.title = f ? f.name + " – My Visuals" : "My Visuals";
     let text;
     if (!state.loaded) text = "Loading your library…";
     else if (state.error) text = "Couldn't load your library";
-    else if (n === 0) text = "Nothing here yet";
-    else text = n + (n === 1 ? " image" : " images");
+    else if (f){ const n = countIn(f.id); text = n ? plural(n, "image", "images") : "Empty folder"; }
+    else {
+      const n = state.items.length, k = state.folders.length, parts = [];
+      if (n) parts.push(plural(n, "image", "images"));
+      if (k) parts.push(plural(k, "folder", "folders"));
+      text = parts.length ? parts.join(", ") : "Nothing here yet";
+    }
     $("#meta").textContent = text;
   }
   function renderChips(){
     const box = $("#chips");
     const left = box.scrollLeft;
-    const counts = tagCounts();
+    const scope = scopeItems();
+    const counts = tagCounts(scope);
     if (state.tag && !counts.some(([t]) => t === state.tag)) state.tag = null;
+    box.hidden = !state.loaded || scope.length === 0;
+    const reset = () => { state.tag = null; state.fav = false; render(); };
     box.replaceChildren(
-      h("button", {class:"chip", type:"button", "aria-pressed": String(!state.tag && !state.fav), text:"All",
-        onclick:() => { state.tag = null; state.fav = false; renderChips(); renderGrid(); }}),
+      h("button", {class:"chip", type:"button", "aria-pressed": String(!state.tag && !state.fav), text:"All", onclick:reset}),
       h("button", {class:"chip", type:"button", "aria-pressed": String(state.fav),
-        onclick:() => { state.fav = !state.fav; renderChips(); renderGrid(); }}, icon("heart"), "Favorites"),
+        onclick:() => { state.fav = !state.fav; render(); }}, icon("heart"), "Favorites"),
       counts.map(([t, n]) => h("button", {class:"chip", type:"button", "aria-pressed": String(state.tag === t),
-        onclick:() => { state.tag = state.tag === t ? null : t; renderChips(); renderGrid(); }}, t, h("small", {text:String(n)})))
+        onclick:() => { state.tag = state.tag === t ? null : t; render(); }}, t, h("small", {text:String(n)})))
     );
     box.scrollLeft = left;
   }
+  function folderTile(f){
+    const list = state.items.filter((i) => i.folder === f.id);
+    const n = list.length;
+    const shown = list.slice(0, 4);
+    const thumb = n
+      ? h("div", {class:"thumb mosaic n" + Math.min(n, 4)}, shown.map((it) => h("div", {class:"cell"}, lazyImg(it, ""))))
+      : h("div", {class:"thumb none"}, icon("folder"));
+    return h("div", {class:"tile"},
+      h("button", {class:"open", type:"button", "aria-label":"Open folder " + f.name + ", " + plural(n, "image", "images"), onclick:() => navigate(f.id)},
+        thumb,
+        h("div", {class:"name", text:f.name}),
+        h("div", {class:"sub", text: n ? plural(n, "image", "images") : "Empty"})));
+  }
+  function renderFolders(){
+    const sec = $("#foldersSec");
+    const show = state.loaded && !state.error && canEdit && !state.folder && !isFiltering() && !state.select
+      && (state.folders.length > 0 || state.items.length > 0);
+    sec.hidden = !show;
+    if (!show) return;
+    $("#folderHint").hidden = state.folders.length > 0;
+    $("#folderGrid").hidden = state.folders.length === 0;
+    $("#folderGrid").replaceChildren(...state.folders.map(folderTile));
+  }
   function tile(it){
-    const img = lazyImg(it, it.name || "");
+    const sel = state.select && state.sel.has(it.id);
+    const label = !state.folder && it.folder ? folderName(it.folder) : "";
     const kids = [
-      h("button", {class:"open", type:"button", "aria-label":"Open " + (it.name || "image"), onclick:() => openDetail(it.id)},
-        h("div", {class:"thumb"}, img),
-        h("div", {class:"name", text:it.name || "Untitled"}))
+      h("button", {class:"open", type:"button", "aria-label":(state.select ? "Select " : "Open ") + (it.name || "image"),
+        "aria-pressed": state.select ? String(sel) : null,
+        onclick:() => state.select ? toggleSel(it.id) : openDetail(it.id)},
+        h("div", {class:"thumb"}, lazyImg(it, it.name || "")),
+        h("div", {class:"name", text:it.name || "Untitled"}),
+        label ? h("div", {class:"sub"}, icon("folder"), h("span", {text:label})) : null)
     ];
-    if (canEdit) kids.push(h("button", {class:"heart", type:"button", "aria-pressed": String(!!it.fav),
+    if (state.select) kids.push(h("span", {class:"pick" + (sel ? " on" : "")}, icon("check")));
+    else if (canEdit) kids.push(h("button", {class:"heart", type:"button", "aria-pressed": String(!!it.fav),
       "aria-label": (it.fav ? "Remove from favorites: " : "Add to favorites: ") + (it.name || "image"),
       onclick:(e) => { e.stopPropagation(); patch(it.id, {fav: !it.fav}); }}, icon("heart")));
-    return h("div", {class:"tile"}, kids);
+    return h("div", {class:"tile" + (sel ? " sel" : "")}, kids);
   }
+  function clearFilters(){ state.q = ""; state.tag = null; state.fav = false; $("#q").value = ""; render(); }
+  function addBtn(){ return h("button", {class:"btn", type:"button", onclick:() => $("#file").click()}, icon("plus"), "Add images"); }
   function renderGrid(){
-    const grid = $("#grid"), empty = $("#empty");
+    const grid = $("#grid"), empty = $("#empty"), sec = $("#imagesSec");
     const list = visible();
-    if (io) io.disconnect();
+    const filtering = isFiltering();
     grid.replaceChildren(...list.map(tile));
-    grid.hidden = list.length === 0;
-    if (list.length){ empty.hidden = true; return; }
-    empty.hidden = false;
+    sec.hidden = list.length === 0;
+    empty.hidden = list.length > 0;
+    if (list.length){
+      $("#imagesTitle").textContent = state.select
+        ? (state.sel.size ? plural(state.sel.size, "image", "images") + " selected" : "Tap images to select")
+        : filtering ? "Results" : state.folder ? "Images" : (state.folders.length ? "Unfiled" : "Images");
+      $("#selectBtn").hidden = !canEdit;
+      $("#selectBtn").textContent = !state.select ? "Select" : (list.every((i) => state.sel.has(i.id)) ? "Clear" : "Select all");
+      return;
+    }
     if (!state.loaded){
       empty.replaceChildren(icon("image"), h("h2", {text:"Loading"}), h("p", {text:"Getting your images ready."}));
     } else if (state.error){
       empty.replaceChildren(icon("image"), h("h2", {text:"Library unavailable"}),
-        h("p", {text: "Check your connection or reconnect in settings."}),
-        h("button", {class:"btn", type:"button", text:"Open settings", onclick:openSettings}));
-    } else if (state.items.length === 0){
-      if (canEdit) empty.replaceChildren(icon("image"), h("h2", {text:"Your library is empty"}), h("p", {text:"Tap Add images to upload icons and graphics."}));
-      else empty.replaceChildren(icon("image"), h("h2", {text:"Connect your library"}), h("p", {text:"Link your private repo to see and add images."}),
-        h("button", {class:"btn", type:"button", text:"Connect", onclick:openSettings}));
-    } else {
+        h("p", {text:"Check your connection or reconnect in settings."}),
+        h("div", {class:"emptyrow"}, h("button", {class:"btn", type:"button", text:"Open settings", onclick:openSettings})));
+    } else if (!canEdit){
+      empty.replaceChildren(icon("image"), h("h2", {text:"Connect your library"}), h("p", {text:"Link your private repo to see and add images."}),
+        h("div", {class:"emptyrow"}, h("button", {class:"btn", type:"button", text:"Connect", onclick:openSettings})));
+    } else if (filtering){
       empty.replaceChildren(icon("search"), h("h2", {text:"No matches"}), h("p", {text:"Try a different word or tag."}),
-        h("button", {class:"btn", type:"button", text:"Clear filters", onclick:() => {
-          state.q = ""; state.tag = null; state.fav = false; $("#q").value = ""; renderChips(); renderGrid();
-        }}));
+        h("div", {class:"emptyrow"}, h("button", {class:"btn", type:"button", text:"Clear filters", onclick:clearFilters})));
+    } else if (state.folder){
+      empty.replaceChildren(icon("folder"), h("h2", {text:"This folder is empty"}), h("p", {text:"Add images here, or move some in from your library."}),
+        h("div", {class:"emptyrow"}, addBtn()));
+    } else if (state.items.length === 0){
+      empty.replaceChildren(icon("image"), h("h2", {text:"Your library is empty"}), h("p", {text:"Add images now, or make a folder first."}),
+        h("div", {class:"emptyrow"}, addBtn(),
+          h("button", {class:"btn", type:"button", onclick:() => openFolderSheet({mode:"new"})}, icon("folderplus"), "New folder")));
+    } else {
+      empty.hidden = true;   // everything is sorted into folders
     }
   }
-  function render(){ renderMeta(); renderChips(); renderGrid(); $("#dock").hidden = !canEdit; setSync(state.sync); }
+  function renderDock(){
+    $("#dock").hidden = !canEdit;
+    $("#addBtn").hidden = state.select;
+    $("#selBar").hidden = !state.select;
+    const none = state.sel.size === 0;
+    $("#bMove").disabled = none; $("#bDel").disabled = none;
+  }
+  function render(){
+    if (io) io.disconnect();
+    renderHeader(); renderFolders(); renderChips(); renderGrid(); renderDock(); setSync(state.sync);
+  }
+
+  // ---------- selecting ----------
+  let bArm = false, bTimer;
+  function resetBulkDelete(){ bArm = false; clearTimeout(bTimer); $("#bDel").replaceChildren(icon("trash"), "Delete"); }
+  function enterSelect(){ state.select = true; state.sel.clear(); resetBulkDelete(); render(); }
+  function exitSelect(){ state.select = false; state.sel.clear(); resetBulkDelete(); }
+  function toggleSel(id){
+    if (state.sel.has(id)) state.sel.delete(id); else state.sel.add(id);
+    resetBulkDelete(); render();
+  }
+  function toggleAll(){
+    const list = visible();
+    if (list.every((i) => state.sel.has(i.id))) state.sel.clear();
+    else list.forEach((i) => state.sel.add(i.id));
+    resetBulkDelete(); render();
+  }
+  function bulkDelete(){
+    const list = [...state.sel].map(find).filter(Boolean);
+    if (!list.length) return;
+    if (!bArm){
+      bArm = true; $("#bDel").replaceChildren(icon("trash"), "Tap again to delete");
+      bTimer = setTimeout(resetBulkDelete, 4000);
+      return;
+    }
+    exitSelect();
+    removeItems(list);
+  }
 
   // ---------- sheets ----------
   function showSheet(id){
     $("#backdrop").hidden = false; $(id).hidden = false; document.body.classList.add("lock");
     const first = $(id).querySelector(".round"); if (first) first.focus({preventScroll:true});
   }
+  const topOpen = () => !$("#backdrop2").hidden;
+  function openTop(id){ $("#backdrop2").hidden = false; $(id).hidden = false; document.body.classList.add("lock"); }
+  function closeTop(){
+    $("#backdrop2").hidden = true;
+    for (const s of ["#folderSheet", "#moveSheet"]) $(s).hidden = true;
+    resetFolderDelete();
+    if ($("#backdrop").hidden) document.body.classList.remove("lock");
+    const c = folderCtx; folderCtx = null;
+    if (c && c.cancel) c.cancel();
+  }
   function closeSheets(){
     if (state.uploading) return;
+    closeTop();
     $("#backdrop").hidden = true;
     for (const s of ["#upload", "#detail", "#settings"]) $(s).hidden = true;
     document.body.classList.remove("lock");
     state.openId = null; state.pending = [];
     previewUrls.forEach((u) => URL.revokeObjectURL(u)); previewUrls = [];
     resetDelete();
+  }
+
+  // ---------- folders ----------
+  function fillFolderSelect(sel, value){
+    sel.replaceChildren(
+      h("option", {value:"", text:"Unfiled"}),
+      ...state.folders.map((f) => h("option", {value:f.id, text:f.name})),
+      h("option", {value:"__new", text:"New folder…"}));
+    sel.value = value || "";
+    sel.dataset.prev = sel.value;
+  }
+  function openFolderSheet(ctx){
+    folderCtx = ctx;
+    const edit = ctx.mode === "edit", f = edit ? findFolder(ctx.id) : null;
+    if (edit && !f){ folderCtx = null; return; }
+    $("#fTitle").textContent = edit ? "Edit folder" : "New folder";
+    $("#fSave").textContent = edit ? "Save name" : "Create folder";
+    $("#fName").value = f ? f.name : "";
+    $("#fMsg").textContent = ""; $("#fMsg").className = "formmsg";
+    $("#fDel").hidden = !edit; $("#fNote").hidden = !edit;
+    resetFolderDelete();
+    openTop("#folderSheet");
+    setTimeout(() => { $("#fName").focus(); if (edit) $("#fName").select(); }, 30);
+  }
+  function fMsg(t){ const m = $("#fMsg"); m.textContent = t; m.className = "formmsg bad"; }
+  function saveFolder(){
+    const ctx = folderCtx; if (!ctx) return;
+    const name = $("#fName").value.trim().replace(/\s+/g, " ").slice(0, 40);
+    if (!name){ fMsg("Give the folder a name."); return; }
+    const dup = state.folders.find((f) => f.name.toLowerCase() === name.toLowerCase() && f.id !== ctx.id);
+    if (dup){ fMsg("You already have a folder called " + dup.name + "."); return; }
+    let id = ctx.id;
+    if (ctx.mode === "edit"){
+      const f = findFolder(id); if (f) f.name = name;
+    } else {
+      id = uid(); state.folders.push({id, name, createdAt:Date.now()});
+    }
+    sortFolders();
+    folderCtx = null; closeTop();
+    render(); refreshDetail(); scheduleSave();
+    if (ctx.mode === "new") toast("Folder created");
+    if (ctx.then) ctx.then(id);
+  }
+  let fArm = false, fTimer;
+  function resetFolderDelete(){ fArm = false; clearTimeout(fTimer); $("#fDel").replaceChildren(icon("trash"), "Delete folder"); }
+  function deleteFolder(){
+    const ctx = folderCtx; if (!ctx || ctx.mode !== "edit") return;
+    if (!fArm){
+      fArm = true; $("#fDel").replaceChildren(icon("trash"), "Tap again to delete");
+      fTimer = setTimeout(resetFolderDelete, 4000);
+      return;
+    }
+    const id = ctx.id, n = countIn(id);
+    deleted.folders.add(id);
+    state.folders = state.folders.filter((f) => f.id !== id);
+    state.items = state.items.map((i) => i.folder === id ? Object.assign({}, i, {folder:null}) : i);
+    folderCtx = null; closeTop();
+    if (state.folder === id) navigate(null); else render();
+    refreshDetail(); scheduleSave();
+    toast(n ? "Folder deleted. " + plural(n, "image is", "images are") + " now unfiled." : "Folder deleted");
+  }
+  function openMove(ids){
+    const items = ids.map(find).filter(Boolean);
+    if (!items.length) return;
+    const cur = new Set(items.map((i) => i.folder || null));
+    const only = cur.size === 1 ? [...cur][0] : undefined;
+    $("#mTitle").textContent = "Move " + plural(items.length, "image", "images") + " to";
+    const go = (id) => {
+      closeTop(); exitSelect();
+      const n = moveItems(items.map((i) => i.id), id);
+      render();
+      toast(n ? "Moved " + plural(n, "image", "images") + " to " + (id ? folderName(id) : "Unfiled") : "Already there");
+    };
+    const row = (label, count, id, ico) => h("button", {class:"row", type:"button", "aria-pressed": String(only === id), onclick:() => go(id)},
+      icon(ico), h("span", {class:"rl", text:label}), h("small", {text:String(count)}));
+    $("#mList").replaceChildren(
+      row("Unfiled", countIn(null), null, "image"),
+      ...state.folders.map((f) => row(f.name, countIn(f.id), f.id, "folder")),
+      h("button", {class:"row", type:"button", onclick:() => {
+        closeTop();
+        openFolderSheet({mode:"new", then:(id) => { exitSelect(); const n = moveItems(items.map((i) => i.id), id); render(); if (n) toast("Moved " + plural(n, "image", "images") + " to " + folderName(id)); }});
+      }}, icon("folderplus"), h("span", {class:"rl", text:"New folder…"})));
+    openTop("#moveSheet");
   }
 
   // ---------- detail ----------
@@ -607,12 +1054,15 @@ header p{margin:4px 0 0;font-size:15px}
     state.openId = id;
     const img = $("#dImg");
     img.removeAttribute("src"); img.alt = it.name || "";
-    getUrl(it, false).then((u) => { if (state.openId === it.id) img.src = u; }, () => toast("Couldn't load this image."));
+    const small = peek(it, true);
+    if (small) img.src = small;   // show the preview instantly while the full image loads
+    getUrl(it, false).then((u) => { if (state.openId === it.id) img.src = u; }, () => { if (!small) toast("Couldn't load this image."); });
     $("#dName").value = it.name || "";
     $("#dName").readOnly = !canEdit;
     $("#dAddRow").hidden = !canEdit;
     $("#dFav").hidden = !canEdit;
     $("#dDel").hidden = !canEdit;
+    $("#dFolderRow").hidden = !canEdit;
     $("#dDl").replaceChildren(icon("download"), "Download");
     resetDelete();
     refreshDetail();
@@ -624,6 +1074,7 @@ header p{margin:4px 0 0;font-size:15px}
     if (!it){ closeSheets(); return; }
     const name = $("#dName");
     if (document.activeElement !== name && name.value !== (it.name || "")) name.value = it.name || "";
+    fillFolderSelect($("#dFolder"), it.folder || "");
     const fav = $("#dFav");
     fav.setAttribute("aria-pressed", String(!!it.fav));
     fav.replaceChildren(icon("heart"), it.fav ? "Favorited" : "Favorite");
@@ -651,7 +1102,7 @@ header p{margin:4px 0 0;font-size:15px}
       document.body.append(a); a.click(); a.remove();
     } catch (e) { toast("Couldn't download this image."); }
   }
-  async function remove(){
+  function remove(){
     const it = find(state.openId); if (!it || !canEdit) return;
     if (!delArmed){
       delArmed = true;
@@ -659,19 +1110,19 @@ header p{margin:4px 0 0;font-size:15px}
       delTimer = setTimeout(resetDelete, 4000);
       return;
     }
-    clearTimeout(delTimer);
-    state.items = state.items.filter((x) => x.id !== it.id);
-    closeSheets(); render(); toast("Deleted");
-    await flushSave();
-    const delFile = async (path, known) => {
-      try {
-        let sha = known;
-        if (!sha){ const r = await gh("GET", path + "?ref=" + encodeURIComponent(cfg.branch)); sha = r.ok ? r.json.sha : null; }
-        if (sha) await gh("DELETE", path, {message:"Delete " + path, sha, branch:cfg.branch});
-      } catch (e) {}
-    };
-    await delFile("contents/images/" + it.file, it.sha);
-    if (it.thumb) await delFile("contents/thumbs/" + it.thumb);
+    removeItems([it]);
+  }
+  function removeItems(list){
+    const ids = new Set(list.map((i) => i.id));
+    ids.forEach((id) => deleted.items.add(id));
+    state.items = state.items.filter((i) => !ids.has(i.id));
+    for (const it of list){
+      pendingDel.push({path:"contents/images/" + it.file, sha:it.sha});
+      if (it.thumb) pendingDel.push({path:"contents/thumbs/" + it.thumb});
+    }
+    closeSheets(); render();
+    toast(list.length === 1 ? "Deleted" : plural(list.length, "image", "images") + " deleted");
+    return flushSave();
   }
 
   // ---------- upload ----------
@@ -694,7 +1145,15 @@ header p{margin:4px 0 0;font-size:15px}
     const m = /\.([a-z0-9]+)$/i.exec(f.name || "");
     return m ? (BY_EXT[m[1].toLowerCase()] || null) : null;
   }
+  function takeFiles(files){
+    if (!canEdit || state.uploading) return;
+    const ok = [], bad = [];
+    for (const f of files){ const type = normType(f); if (type) ok.push({file:f, type}); else bad.push(f); }
+    if (bad.length) toast(plural(bad.length, "file", "files") + " skipped. Use PNG, JPG, GIF, WebP or SVG.");
+    if (ok.length) openUpload(ok);
+  }
   function openUpload(list){
+    previewUrls.forEach((u) => URL.revokeObjectURL(u));
     state.pending = list;
     const n = list.length;
     $("#upTitle").textContent = n === 1 ? "Add 1 image" : "Add " + n + " images";
@@ -702,9 +1161,10 @@ header p{margin:4px 0 0;font-size:15px}
     $("#upStatus").textContent = "";
     $("#upGo").disabled = false;
     $("#upGo").replaceChildren(icon("plus"), n === 1 ? "Upload image" : "Upload " + n + " images");
+    fillFolderSelect($("#upFolder"), state.folder || "");
     previewUrls = list.map((p) => URL.createObjectURL(p.file));
     $("#upStrip").replaceChildren(...previewUrls.map((u) => h("div", {class:"sm"}, h("img", {src:u, alt:""}))));
-    $("#upSuggest").replaceChildren(...tagCounts().slice(0, 8).map(([t]) => h("button", {class:"chip", type:"button", text:t, onclick:() => {
+    $("#upSuggest").replaceChildren(...tagCounts(state.items).slice(0, 8).map(([t]) => h("button", {class:"chip", type:"button", text:t, onclick:() => {
       const cur = parseTags($("#upTags").value);
       if (!cur.includes(t)) cur.push(t);
       $("#upTags").value = cur.join(", ");
@@ -714,49 +1174,56 @@ header p{margin:4px 0 0;font-size:15px}
   async function doUpload(){
     if (!canEdit || state.uploading) return;
     const tags = parseTags($("#upTags").value).slice(0, 20);
+    const folder = $("#upFolder").value && findFolder($("#upFolder").value) ? $("#upFolder").value : null;
     const doShrink = $("#upShrink").checked;
     const list = state.pending.slice();
     const n = list.length;
     state.uploading = true; $("#upGo").disabled = true; $("#upClose").disabled = true;
-    const added = []; let failed = 0, fatal = null;
+    const added = []; let failed = 0, tooBig = 0, slow = 0, fatal = null;
     for (let i = 0; i < n; i++){
       $("#upStatus").textContent = "Uploading " + (i + 1) + " of " + n + "…";
       const {file, type} = list[i];
       try {
         const blob = doShrink ? await shrink(file, type) : file;
-        const id = Math.random().toString(36).slice(2, 8);
+        if (blob.size > MAX_BYTES){ tooBig++; continue; }
+        const id = uid();
         const name = slug(file.name) + "-" + id + "." + EXT[type];
-        const r = await gh("PUT", "contents/images/" + name, {message:"Add " + name, branch:cfg.branch, content: await blobB64(blob)});
+        const r = await ghWrite("PUT", "contents/images/" + name, {message:"Add " + name, branch:cfg.branch, content: await blobB64(blob)});
         if (!r.ok){
-          if ([401, 403, 404].includes(r.status)){ fatal = r.status; failed += n - i; break; }
+          if (r.status === 401 || r.status === 404 || (r.status === 403 && !r.limited)){ fatal = r.status; failed += n - i; break; }
+          if (r.limited) slow++;
           failed++; continue;
         }
         let thumb;
         const t = await makeThumb(blob, type);
         if (t){
           const tn = name.replace(/\.[^.]+$/, "") + "." + t.ext;
-          const tr = await gh("PUT", "contents/thumbs/" + tn, {message:"Add thumbnail " + tn, branch:cfg.branch, content: await blobB64(t.blob)});
+          const tr = await ghWrite("PUT", "contents/thumbs/" + tn, {message:"Add thumbnail " + tn, branch:cfg.branch, content: await blobB64(t.blob)});
           if (tr.ok) thumb = tn;
         }
-        added.push({id, file:name, name:baseName(file.name), tags, fav:false, createdAt:Date.now() + (n - i), size:blob.size, type, sha:r.json.content.sha, thumb, _url:URL.createObjectURL(blob)});
+        added.push({id, file:name, name:baseName(file.name), tags, fav:false, folder, createdAt:Date.now() + (n - i), size:blob.size, type, sha:r.json.content.sha, thumb, _url:URL.createObjectURL(blob)});
       } catch (e) { failed++; }
     }
     state.uploading = false; $("#upClose").disabled = false;
     if (added.length){
       state.items = [...added, ...state.items];
       closeSheets(); render();
-      await flushSave();
+      flushSave();
     } else closeSheets();
-    let msg = added.length ? added.length + (added.length === 1 ? " image added" : " images added") : "Nothing was added";
-    if (failed) msg += ". " + failed + (fatal ? " failed: " + (fatal === 404 ? "repo not found, check settings." : "token lacks write access.") : " didn't upload.");
+    let msg = added.length ? plural(added.length, "image", "images") + " added" + (folder ? " to " + folderName(folder) : "") : "Nothing was added";
+    if (tooBig) msg += ". " + plural(tooBig, "file was", "files were") + " over 25 MB.";
+    if (failed) msg += ". " + failed + (fatal ? " failed: " + (fatal === 404 ? "repo not found, check settings." : "token lacks write access.")
+      : slow ? " were slowed down by GitHub. Try those again in a minute." : " didn't upload.");
     toast(msg);
   }
 
   // ---------- settings ----------
   function openSettings(){
-    $("#sOwner").value = cfg.owner; $("#sRepo").value = cfg.repo; $("#sToken").value = "";
+    $("#sOwner").value = cfg.owner; $("#sRepo").value = cfg.repo || "visuals-data"; $("#sToken").value = "";
     $("#sToken").placeholder = cfg.token ? "Connected. Paste a new token to replace it" : "github_pat_…";
     $("#sOut").hidden = !cfg.token;
+    const st = $("#sStatus");
+    st.hidden = !canEdit; st.textContent = canEdit ? "Connected to " + cfg.owner + "/" + cfg.repo : "";
     $("#sMsg").textContent = ""; $("#sMsg").className = "formmsg";
     showSheet("#settings");
   }
@@ -776,9 +1243,13 @@ header p{margin:4px 0 0;font-size:15px}
       else if (r.json.permissions && r.json.permissions.push === false){ cfg = prev; sMsg("This token can't write. Set Contents to Read and write.", true); }
       else {
         cfg.branch = r.json.default_branch || "main";
-        saveCfg(); canEdit = true;
-        closeSheets(); toast(r.json.private === false ? "Connected, but this repo is public. Make it private in the repo settings." : "Connected");
-        await start();
+        const b = await gh("GET", "branches/" + enc(cfg.branch));
+        if (b.status === 404){ cfg = prev; sMsg("That repo has no files yet. On GitHub, add a README to it once, then try again.", true); }
+        else {
+          saveCfg(); canEdit = true;
+          closeSheets(); toast(r.json.private === false ? "Connected, but this repo is public. Make it private in the repo settings." : "Connected");
+          await start();
+        }
       }
     } catch (e) { cfg = prev; sMsg("Couldn't reach GitHub. Check your connection.", true); }
     $("#sSave").disabled = false;
@@ -786,6 +1257,8 @@ header p{margin:4px 0 0;font-size:15px}
   function disconnect(){
     cfg.token = ""; saveCfg(); canEdit = false;
     urlCache.forEach((u) => URL.revokeObjectURL(u)); urlCache.clear();
+    try { if (window.caches) caches.delete(CACHE); } catch (e) {}
+    state.items = []; state.folders = []; state.folder = null; exitSelect();
     closeSheets(); toast("Disconnected. This device is view-only now.");
     start();
   }
@@ -794,22 +1267,51 @@ header p{margin:4px 0 0;font-size:15px}
   $("#searchIco").innerHTML = ICONS.search;
   $("#addIco").innerHTML = ICONS.plus;
   $("#gear").replaceChildren(icon("gear"));
-  for (const id of ["#upClose", "#dClose", "#sClose"]) $(id).replaceChildren(icon("close"));
+  $("#back").replaceChildren(icon("back"));
+  $("#editFolder").replaceChildren(icon("pencil"));
+  $("#newFolder").replaceChildren(icon("folderplus"), "New folder");
+  $("#bMove").replaceChildren(icon("folder"), "Move");
+  resetBulkDelete(); resetFolderDelete();
+  for (const id of ["#upClose", "#dClose", "#sClose", "#fClose", "#mClose"]) $(id).replaceChildren(icon("close"));
+  for (const w of document.querySelectorAll(".selwrap")) w.append(icon("chev"));
 
-  $("#q").addEventListener("input", (e) => { state.q = e.target.value; renderGrid(); });
+  $("#q").addEventListener("input", (e) => { state.q = e.target.value; render(); });
   $("#gear").addEventListener("click", openSettings);
+  $("#back").addEventListener("click", () => navigate(null));
+  $("#editFolder").addEventListener("click", () => openFolderSheet({mode:"edit", id:state.folder}));
+  $("#newFolder").addEventListener("click", () => openFolderSheet({mode:"new"}));
   $("#sync").addEventListener("click", () => { if (state.sync === "error") flushSave(); });
   $("#addBtn").addEventListener("click", () => $("#file").click());
-  $("#file").addEventListener("change", (e) => {
-    const files = [...e.target.files]; e.target.value = "";
-    const ok = [], bad = [];
-    for (const f of files){ const type = normType(f); if (type) ok.push({file:f, type}); else bad.push(f); }
-    if (bad.length) toast(bad.length + (bad.length === 1 ? " file skipped." : " files skipped.") + " Use PNG, JPG, GIF, WebP or SVG.");
-    if (ok.length) openUpload(ok);
-  });
+  $("#file").addEventListener("change", (e) => { const files = [...e.target.files]; e.target.value = ""; takeFiles(files); });
+  $("#selectBtn").addEventListener("click", () => state.select ? toggleAll() : enterSelect());
+  $("#bDone").addEventListener("click", () => { exitSelect(); render(); });
+  $("#bMove").addEventListener("click", () => openMove([...state.sel]));
+  $("#bDel").addEventListener("click", bulkDelete);
   $("#upGo").addEventListener("click", doUpload);
   for (const id of ["#upClose", "#dClose", "#sClose", "#backdrop"]) $(id).addEventListener("click", closeSheets);
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeSheets(); });
+  for (const id of ["#fClose", "#mClose", "#backdrop2"]) $(id).addEventListener("click", closeTop);
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape"){ if (topOpen()) closeTop(); else closeSheets(); } });
+  $("#fSave").addEventListener("click", saveFolder);
+  $("#fDel").addEventListener("click", deleteFolder);
+  $("#fName").addEventListener("keydown", (e) => { if (e.key === "Enter"){ e.preventDefault(); saveFolder(); } });
+  $("#upFolder").addEventListener("change", (e) => {
+    const sel = e.target;
+    if (sel.value === "__new"){
+      sel.value = sel.dataset.prev || "";
+      openFolderSheet({mode:"new", then:(id) => fillFolderSelect(sel, id)});
+    } else sel.dataset.prev = sel.value;
+  });
+  $("#dFolder").addEventListener("change", (e) => {
+    const it = find(state.openId); if (!it || !canEdit) return;
+    const sel = e.target;
+    if (sel.value === "__new"){
+      sel.value = it.folder || "";
+      openFolderSheet({mode:"new", then:(id) => { moveItems([it.id], id); toast("Moved to " + folderName(id)); }});
+      return;
+    }
+    const n = moveItems([it.id], sel.value || null);
+    if (n) toast(sel.value ? "Moved to " + folderName(sel.value) : "Moved to Unfiled");
+  });
   $("#dName").addEventListener("change", (e) => {
     const it = find(state.openId); if (!it || !canEdit) return;
     const v = e.target.value.trim().slice(0, 80) || it.name || "Untitled";
@@ -824,20 +1326,35 @@ header p{margin:4px 0 0;font-size:15px}
   $("#sSave").addEventListener("click", connect);
   $("#sOut").addEventListener("click", disconnect);
 
+  // drag images onto the page, or paste them
+  const hasFiles = (e) => !!(e.dataTransfer && [...(e.dataTransfer.types || [])].includes("Files"));
+  window.addEventListener("dragover", (e) => { if (canEdit && hasFiles(e)){ e.preventDefault(); $("#drop").hidden = false; } });
+  window.addEventListener("dragleave", (e) => { if (!e.relatedTarget) $("#drop").hidden = true; });
+  window.addEventListener("drop", (e) => {
+    if (!hasFiles(e)) return;
+    e.preventDefault(); $("#drop").hidden = true;
+    takeFiles([...e.dataTransfer.files]);
+  });
+  document.addEventListener("paste", (e) => {
+    const files = [...((e.clipboardData && e.clipboardData.files) || [])].filter((f) => normType(f));
+    if (files.length){ e.preventDefault(); takeFiles(files); }
+  });
+
   function banner(msg){ const b = $("#banner"); b.textContent = msg; b.hidden = !msg; }
 
   async function start(){
     state.loaded = false; state.error = null; banner(""); render();
-    if (!canEdit){ state.items = []; state.loaded = true; render(); return; }
+    if (!canEdit){ state.items = []; state.folders = []; state.loaded = true; applyRoute(); render(); return; }
     try {
       await loadLibrary();
     } catch (e) {
       if (e && e.status === 401){
-        canEdit = false; state.items = [];
+        canEdit = false; state.items = []; state.folders = [];
         banner("GitHub rejected your token. Open settings to reconnect.");
       } else state.error = true;
     }
     state.loaded = true;
+    applyRoute();
     render();
   }
   start();
