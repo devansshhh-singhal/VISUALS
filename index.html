@@ -117,7 +117,7 @@ header p{margin:4px 0 0;font-size:15px}
 .mosaic.n1{grid-template-columns:1fr;grid-template-rows:1fr;padding:12px}
 .mosaic.n2{grid-template-rows:1fr}
 .mosaic .cell{min-width:0;min-height:0;display:grid;place-items:center;overflow:hidden;border-radius:10px}
-.mosaic .cell img{max-width:100%;max-height:100%;object-fit:contain}
+.mosaic .cell img{width:100%;height:100%;object-fit:cover}
 .heart{
   position:absolute;top:16px;right:16px;width:44px;height:44px;border:0;border-radius:50%;
   background:var(--bg);box-shadow:var(--raise-sm);color:var(--muted);display:grid;place-items:center;padding:0;
@@ -236,6 +236,37 @@ details.info code{font-size:14px;color:var(--text)}
   transition:opacity .2s,transform .2s;
 }
 .toast.on{opacity:1;transform:translate(-50%,0)}
+
+.viewer{position:fixed;inset:0;z-index:18;background:var(--bg);touch-action:pan-x pinch-zoom;overscroll-behavior:contain}
+.vscroll{
+  position:absolute;inset:0;display:flex;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;
+  scroll-snap-type:x mandatory;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch;
+}
+.vscroll::-webkit-scrollbar{display:none}
+.slide{
+  flex:none;width:100%;height:100%;scroll-snap-align:center;scroll-snap-stop:always;display:grid;place-items:center;
+  padding:calc(84px + env(safe-area-inset-top,0px)) 14px calc(100px + env(safe-area-inset-bottom,0px));
+}
+.slide img{max-width:100%;max-height:100%;object-fit:contain;user-select:none;-webkit-user-select:none;-webkit-user-drag:none}
+.vtop,.vbot{position:absolute;left:0;right:0;display:flex;align-items:center;pointer-events:none;transition:opacity .2s}
+.vtop{top:0;gap:12px;padding:calc(12px + env(safe-area-inset-top,0px)) 16px 22px;background:linear-gradient(to bottom,var(--bg) 60%,transparent)}
+.vbot{bottom:0;justify-content:center;gap:24px;padding:26px 16px calc(18px + env(safe-area-inset-bottom,0px));background:linear-gradient(to top,var(--bg) 55%,transparent)}
+.vtop .round,.vbot .round{pointer-events:auto}
+.vgap{flex:none;width:46px}
+.vtitle{flex:1;min-width:0;text-align:center}
+.vname{font-weight:800;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vcount{font-size:14px;font-weight:700;color:var(--muted)}
+.round.big{width:56px;height:56px}
+.round.big .ico svg{width:24px;height:24px}
+.vbot .round[aria-pressed="true"]{color:var(--heart);box-shadow:var(--inset)}
+.vbot .round[aria-pressed="true"] .ico svg{fill:currentColor}
+.round.vnav{position:absolute;top:50%;transform:translateY(-50%);display:none;transition:opacity .2s}
+.round.vnav.prev{left:18px}
+.round.vnav.next{right:18px}
+.round.vnav[disabled]{opacity:.35;pointer-events:none}
+@media (hover:hover) and (pointer:fine){.round.vnav{display:grid}}
+.viewer.hide-ui .vtop,.viewer.hide-ui .vbot,.viewer.hide-ui .vnav{opacity:0;visibility:hidden;transition:opacity .2s,visibility 0s linear .2s}
+@media (prefers-reduced-motion:reduce){.vtop,.vbot,.vnav{transition:none!important}}
 </style>
 </head>
 <body>
@@ -293,6 +324,22 @@ details.info code{font-size:14px;color:var(--text)}
     <button class="btn" id="bDone" type="button">Cancel</button>
   </div>
   <input id="file" type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml,.svg" multiple hidden>
+</div>
+
+<div id="viewer" class="viewer" role="dialog" aria-modal="true" aria-label="Image viewer" hidden>
+  <div id="vScroll" class="vscroll"></div>
+  <div class="vtop">
+    <button class="round" id="vClose" type="button" aria-label="Close viewer"></button>
+    <div class="vtitle"><div class="vname" id="vName"></div><div class="vcount" id="vCount" aria-live="polite"></div></div>
+    <span class="vgap"></span>
+  </div>
+  <button class="round vnav prev" id="vPrev" type="button" aria-label="Previous image"></button>
+  <button class="round vnav next" id="vNext" type="button" aria-label="Next image"></button>
+  <div class="vbot">
+    <button class="round big" id="vFav" type="button" aria-pressed="false" aria-label="Favorite"></button>
+    <button class="round big" id="vDl" type="button" aria-label="Download"></button>
+    <button class="round big" id="vInfo" type="button" aria-label="Details, tags and folder"></button>
+  </div>
 </div>
 
 <div id="backdrop" class="backdrop" hidden></div>
@@ -428,7 +475,9 @@ details.info code{font-size:14px;color:var(--text)}
     back:`<svg viewBox="0 0 24 24" ${P}><path d="M15 5l-7 7 7 7"/></svg>`,
     check:`<svg viewBox="0 0 24 24" ${P}><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>`,
     pencil:`<svg viewBox="0 0 24 24" ${P}><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg>`,
-    chev:`<svg viewBox="0 0 24 24" ${P}><path d="M6 9l6 6 6-6"/></svg>`
+    chev:`<svg viewBox="0 0 24 24" ${P}><path d="M6 9l6 6 6-6"/></svg>`,
+    next:`<svg viewBox="0 0 24 24" ${P}><path d="M9 5l7 7-7 7"/></svg>`,
+    info:`<svg viewBox="0 0 24 24" ${P}><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 7.6h.01"/></svg>`
   };
   const EXT = {"image/png":"png","image/jpeg":"jpg","image/gif":"gif","image/webp":"webp","image/svg+xml":"svg"};
   const BY_EXT = {png:"image/png",jpg:"image/jpeg",jpeg:"image/jpeg",gif:"image/gif",webp:"image/webp",svg:"image/svg+xml"};
@@ -533,10 +582,10 @@ details.info code{font-size:14px;color:var(--text)}
       job().finally(() => { active--; pump(); });
     }
   }
-  function queue(fn){ return new Promise((res, rej) => { waiting.push(() => fn().then(res, rej)); pump(); }); }
+  function queue(fn, urgent){ return new Promise((res, rej) => { const job = () => fn().then(res, rej); if (urgent) waiting.unshift(job); else waiting.push(job); pump(); }); }
   const pathFor = (it, thumb) => thumb && it.thumb ? "thumbs/" + it.thumb : "images/" + it.file;
   const peek = (it, thumb) => it._url || urlCache.get(pathFor(it, thumb)) || null;
-  function fetchBlobUrl(path){
+  function fetchBlobUrl(path, urgent){
     if (urlCache.has(path)) return Promise.resolve(urlCache.get(path));
     return queue(async () => {
       if (urlCache.has(path)) return urlCache.get(path);
@@ -551,10 +600,10 @@ details.info code{font-size:14px;color:var(--text)}
       const url = URL.createObjectURL(blob);
       urlCache.set(path, url);
       return url;
-    });
+    }, urgent);
   }
-  function getUrl(it, thumb){
-    return it._url ? Promise.resolve(it._url) : fetchBlobUrl(pathFor(it, thumb));
+  function getUrl(it, thumb, urgent){
+    return it._url ? Promise.resolve(it._url) : fetchBlobUrl(pathFor(it, thumb), urgent);
   }
   const io = "IntersectionObserver" in window
     ? new IntersectionObserver((entries) => {
@@ -766,7 +815,10 @@ details.info code{font-size:14px;color:var(--text)}
     try { history.pushState(null, "", id ? "#f=" + id : location.pathname + location.search); } catch (e) {}
     applyRoute(); render(); window.scrollTo(0, 0);
   }
-  window.addEventListener("popstate", () => { applyRoute(); render(); });
+  window.addEventListener("popstate", () => {
+    if (viewer.open){ hideViewer(); return; }
+    applyRoute(); render();
+  });
 
   // ---------- render ----------
   function visible(){
@@ -852,7 +904,7 @@ details.info code{font-size:14px;color:var(--text)}
     const kids = [
       h("button", {class:"open", type:"button", "aria-label":(state.select ? "Select " : "Open ") + (it.name || "image"),
         "aria-pressed": state.select ? String(sel) : null,
-        onclick:() => state.select ? toggleSel(it.id) : openDetail(it.id)},
+        onclick:() => state.select ? toggleSel(it.id) : openViewer(it.id)},
         h("div", {class:"thumb"}, lazyImg(it, it.name || "")),
         h("div", {class:"name", text:it.name || "Untitled"}),
         label ? h("div", {class:"sub"}, icon("folder"), h("span", {text:label})) : null)
@@ -913,6 +965,7 @@ details.info code{font-size:14px;color:var(--text)}
   function render(){
     if (io) io.disconnect();
     renderHeader(); renderFolders(); renderChips(); renderGrid(); renderDock(); setSync(state.sync);
+    syncViewer();
   }
 
   // ---------- selecting ----------
@@ -953,7 +1006,7 @@ details.info code{font-size:14px;color:var(--text)}
     $("#backdrop2").hidden = true;
     for (const s of ["#folderSheet", "#moveSheet"]) $(s).hidden = true;
     resetFolderDelete();
-    if ($("#backdrop").hidden) document.body.classList.remove("lock");
+    if ($("#backdrop").hidden && !viewer.open) document.body.classList.remove("lock");
     const c = folderCtx; folderCtx = null;
     if (c && c.cancel) c.cancel();
   }
@@ -962,7 +1015,7 @@ details.info code{font-size:14px;color:var(--text)}
     closeTop();
     $("#backdrop").hidden = true;
     for (const s of ["#upload", "#detail", "#settings"]) $(s).hidden = true;
-    document.body.classList.remove("lock");
+    if (!viewer.open) document.body.classList.remove("lock");
     state.openId = null; state.pending = [];
     previewUrls.forEach((u) => URL.revokeObjectURL(u)); previewUrls = [];
     resetDelete();
@@ -1101,8 +1154,8 @@ details.info code{font-size:14px;color:var(--text)}
     input.value = "";
     patch(it.id, {tags: [...new Set([...(it.tags || []), ...add])].slice(0, 20)});
   }
-  async function download(){
-    const it = find(state.openId); if (!it) return;
+  async function download(id){
+    const it = find(id); if (!it) return;
     try {
       const a = document.createElement("a");
       a.href = await getUrl(it, false);
@@ -1225,6 +1278,113 @@ details.info code{font-size:14px;color:var(--text)}
     toast(msg);
   }
 
+  // ---------- viewer (swipe through images like a gallery) ----------
+  const viewer = {open:false, ids:[], idx:0, pushed:false, raf:0};
+  const vScroll = () => $("#vScroll");
+  const reduceMotion = () => !!(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches);
+  function buildSlides(){
+    vScroll().replaceChildren(...viewer.ids.map(() => h("div", {class:"slide"})));
+  }
+  function jumpTo(i){ const sc = vScroll(); sc.scrollLeft = i * (sc.clientWidth || 0); }
+  function ensureSlide(i, full){
+    const slide = vScroll().children[i], it = find(viewer.ids[i]);
+    if (!slide || !it) return;
+    let img = slide.firstElementChild;
+    if (!img){ img = h("img", {alt: it.name || "", decoding:"async", draggable:"false"}); slide.append(img); }
+    if (img.dataset.q === "full") return;
+    if (!img.dataset.q){
+      img.dataset.q = "thumb";
+      getUrl(it, true).then((u) => { if (img.dataset.q !== "full") img.src = u; }, () => {});
+    }
+    if (full && !img.dataset.loading){
+      img.dataset.loading = "1";
+      getUrl(it, false, true).then((u) => { img.src = u; img.dataset.q = "full"; }, () => { delete img.dataset.loading; });
+    }
+  }
+  function updateViewer(){
+    const n = viewer.ids.length, i = viewer.idx, it = find(viewer.ids[i]);
+    if (!it) return;
+    $("#vName").textContent = it.name || "Untitled";
+    $("#vCount").textContent = (i + 1) + " of " + n;
+    const fav = $("#vFav");
+    fav.hidden = !canEdit; $("#vInfo").hidden = !canEdit;
+    fav.setAttribute("aria-pressed", String(!!it.fav));
+    fav.setAttribute("aria-label", it.fav ? "Remove from favorites" : "Add to favorites");
+    $("#vPrev").disabled = i <= 0; $("#vNext").disabled = i >= n - 1;
+    ensureSlide(i, true);
+    ensureSlide(i - 1, true); ensureSlide(i + 1, true);   // neighbours are ready before you swipe
+  }
+  function openViewer(id){
+    const ids = visible().map((i) => i.id), idx = ids.indexOf(id);
+    if (idx < 0) return;
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    viewer.ids = ids; viewer.idx = idx; viewer.open = true;
+    buildSlides();
+    $("#viewer").classList.remove("hide-ui");
+    $("#viewer").hidden = false; document.body.classList.add("lock");
+    $("#vClose").replaceChildren(icon("close"));
+    jumpTo(idx); updateViewer();
+    try { history.pushState({viewer:1}, "", location.href); viewer.pushed = true; } catch (e) { viewer.pushed = false; }
+    $("#vClose").focus({preventScroll:true});
+  }
+  function hideViewer(){
+    if (!viewer.open) return;
+    viewer.open = false; viewer.pushed = false;
+    $("#viewer").hidden = true;
+    vScroll().replaceChildren();
+    closeSheets();
+    if ($("#backdrop").hidden) document.body.classList.remove("lock");
+  }
+  function closeViewer(){
+    if (!viewer.open) return;
+    if (viewer.pushed){
+      history.back();                                  // pops the entry we added; popstate then hides the viewer
+      setTimeout(() => { if (viewer.open) hideViewer(); }, 300);
+    } else hideViewer();
+  }
+  function goView(d){
+    const sc = vScroll(), t = Math.max(0, Math.min(viewer.ids.length - 1, viewer.idx + d));
+    if (t === viewer.idx) return;
+    const left = t * sc.clientWidth;
+    if (sc.scrollTo) sc.scrollTo({left, behavior: reduceMotion() ? "auto" : "smooth"}); else sc.scrollLeft = left;
+  }
+  // if images were deleted while looking at them, close the gap; if none are left, leave
+  function syncViewer(){
+    if (!viewer.open) return;
+    const alive = viewer.ids.filter((id) => find(id));
+    if (alive.length !== viewer.ids.length){
+      if (!alive.length){ closeViewer(); return; }
+      const cur = viewer.ids[viewer.idx];
+      let idx = alive.indexOf(cur);
+      if (idx < 0) idx = viewer.ids.slice(0, viewer.idx).filter((id) => find(id)).length;
+      viewer.ids = alive; viewer.idx = Math.min(idx, alive.length - 1);
+      buildSlides(); jumpTo(viewer.idx);
+    }
+    updateViewer();
+  }
+  vScroll().addEventListener("scroll", () => {
+    if (viewer.raf) return;
+    viewer.raf = requestAnimationFrame(() => {
+      viewer.raf = 0;
+      const sc = vScroll(), w = sc.clientWidth || 1;
+      const i = Math.max(0, Math.min(viewer.ids.length - 1, Math.round(sc.scrollLeft / w)));
+      if (viewer.open && i !== viewer.idx){ viewer.idx = i; updateViewer(); }
+    });
+  }, {passive:true});
+  vScroll().addEventListener("click", () => $("#viewer").classList.toggle("hide-ui"));   // tap to hide or show the controls
+  window.addEventListener("resize", () => { if (viewer.open) jumpTo(viewer.idx); });   // keep the same image after rotating
+  $("#vClose").addEventListener("click", closeViewer);
+  $("#vPrev").addEventListener("click", () => goView(-1));
+  $("#vNext").addEventListener("click", () => goView(1));
+  $("#vFav").addEventListener("click", () => { const it = find(viewer.ids[viewer.idx]); if (it) patch(it.id, {fav: !it.fav}); });
+  $("#vDl").addEventListener("click", () => download(viewer.ids[viewer.idx]));
+  $("#vInfo").addEventListener("click", () => openDetail(viewer.ids[viewer.idx]));
+  $("#vFav").replaceChildren(icon("heart"));
+  $("#vDl").replaceChildren(icon("download"));
+  $("#vInfo").replaceChildren(icon("info"));
+  $("#vPrev").replaceChildren(icon("back"));
+  $("#vNext").replaceChildren(icon("next"));
+
   // ---------- settings ----------
   function openSettings(){
     $("#sOwner").value = cfg.owner; $("#sRepo").value = cfg.repo || "visuals-data"; $("#sToken").value = "";
@@ -1298,7 +1458,14 @@ details.info code{font-size:14px;color:var(--text)}
   $("#upGo").addEventListener("click", doUpload);
   for (const id of ["#upClose", "#dClose", "#sClose", "#backdrop"]) $(id).addEventListener("click", closeSheets);
   for (const id of ["#fClose", "#mClose", "#backdrop2"]) $(id).addEventListener("click", closeTop);
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape"){ if (topOpen()) closeTop(); else closeSheets(); } });
+  document.addEventListener("keydown", (e) => {
+    const sheetOpen = !$("#backdrop").hidden;
+    if (e.key === "Escape"){
+      if (topOpen()) closeTop(); else if (sheetOpen) closeSheets(); else if (viewer.open) closeViewer();
+    } else if (viewer.open && !sheetOpen && !topOpen() && (e.key === "ArrowLeft" || e.key === "ArrowRight")){
+      e.preventDefault(); goView(e.key === "ArrowLeft" ? -1 : 1);
+    }
+  });
   $("#fSave").addEventListener("click", saveFolder);
   $("#fDel").addEventListener("click", deleteFolder);
   $("#fName").addEventListener("keydown", (e) => { if (e.key === "Enter"){ e.preventDefault(); saveFolder(); } });
@@ -1329,7 +1496,7 @@ details.info code{font-size:14px;color:var(--text)}
   $("#dTagAdd").addEventListener("click", addDetailTags);
   $("#dTagIn").addEventListener("keydown", (e) => { if (e.key === "Enter"){ e.preventDefault(); addDetailTags(); } });
   $("#dFav").addEventListener("click", () => { const it = find(state.openId); if (it) patch(it.id, {fav: !it.fav}); });
-  $("#dDl").addEventListener("click", download);
+  $("#dDl").addEventListener("click", () => download(state.openId));
   $("#dDel").addEventListener("click", remove);
   $("#sSave").addEventListener("click", connect);
   $("#sOut").addEventListener("click", disconnect);
