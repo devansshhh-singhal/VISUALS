@@ -267,6 +267,29 @@ details.info code{font-size:14px;color:var(--text)}
 @media (hover:hover) and (pointer:fine){.round.vnav{display:grid}}
 .viewer.hide-ui .vtop,.viewer.hide-ui .vbot,.viewer.hide-ui .vnav{opacity:0;visibility:hidden;transition:opacity .2s,visibility 0s linear .2s}
 @media (prefers-reduced-motion:reduce){.vtop,.vbot,.vnav{transition:none!important}}
+
+.thumb{position:relative}
+.thumb>.ico svg{width:38px;height:38px}
+.vbadge{
+  position:absolute;left:8px;bottom:8px;display:inline-flex;align-items:center;gap:5px;padding:3px 10px 3px 8px;
+  border-radius:999px;background:var(--bg);box-shadow:var(--raise-sm);color:var(--text);font-size:12px;font-weight:800;line-height:1.4;
+}
+.vbadge .ico svg{width:12px;height:12px}
+.strip .sm video{max-width:100%;max-height:100%;object-fit:contain}
+.vposter{position:relative;width:100%;height:100%;display:grid;place-items:center;cursor:pointer}
+.vposter img{max-width:100%;max-height:100%;object-fit:contain;border-radius:14px}
+.vover{position:absolute;inset:0;display:grid;align-content:center;justify-items:center;gap:12px}
+.round.big.vplay{width:72px;height:72px}
+.vplay .ico svg{width:30px;height:30px}
+.vhint{padding:4px 14px;border-radius:999px;background:var(--bg);box-shadow:var(--raise-sm);font-size:13px;font-weight:700;color:var(--muted);text-align:center;max-width:90%}
+.vwrap{width:100%;height:100%;min-height:0;display:flex;flex-direction:column;align-items:center;gap:8px}
+.vwrap video{flex:1 1 0;min-height:0;width:100%;object-fit:contain;border-radius:14px;background:transparent}
+.vwrap:fullscreen{background:var(--bg);padding:16px}
+.vwrap:-webkit-full-screen{background:var(--bg);padding:16px}
+.vctrl{display:flex;align-items:center;gap:10px;width:100%;max-width:560px}
+.vctrl .round{width:44px;height:44px;flex:none}
+.vctrl input[type="range"]{flex:1;min-width:0;height:44px;margin:0;touch-action:none;accent-color:var(--accent);background:transparent}
+.vtime{flex:none;min-width:78px;text-align:center;font-size:13px;font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
 </style>
 </head>
 <body>
@@ -317,13 +340,13 @@ details.info code{font-size:14px;color:var(--text)}
 </main>
 
 <div class="dock" id="dock" hidden>
-  <button class="cta" id="addBtn" type="button"><span class="ico" id="addIco"></span>Add images</button>
+  <button class="cta" id="addBtn" type="button"><span class="ico" id="addIco"></span>Add images or videos</button>
   <div class="bar" id="selBar" hidden>
     <button class="btn" id="bMove" type="button"></button>
     <button class="btn danger" id="bDel" type="button"></button>
     <button class="btn" id="bDone" type="button">Cancel</button>
   </div>
-  <input id="file" type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml,.svg" multiple hidden>
+  <input id="file" type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/svg+xml,.svg,video/mp4,video/webm,video/quicktime,.mp4,.m4v,.webm,.mov" multiple hidden>
 </div>
 
 <div id="viewer" class="viewer" role="dialog" aria-modal="true" aria-label="Image viewer" hidden>
@@ -344,7 +367,7 @@ details.info code{font-size:14px;color:var(--text)}
 
 <div id="backdrop" class="backdrop" hidden></div>
 <div id="backdrop2" class="backdrop top" hidden></div>
-<div id="drop" class="drop" hidden><div>Drop images to add them</div></div>
+<div id="drop" class="drop" hidden><div>Drop images or videos to add them</div></div>
 
 <section id="upload" class="sheet" role="dialog" aria-modal="true" aria-labelledby="upTitle" hidden>
   <div class="sheethead">
@@ -363,6 +386,7 @@ details.info code{font-size:14px;color:var(--text)}
   <p class="hint">Separate tags with commas. Tap one below to reuse it.</p>
   <div id="upSuggest" class="suggest"></div>
   <label class="check"><input type="checkbox" id="upShrink" checked>Shrink very large photos (recommended)</label>
+  <p class="hint" id="upVidNote" hidden>Videos upload exactly as they are, up to 50 MB each. Larger ones can take a minute.</p>
   <div class="uprow">
     <button class="btn" id="upGo" type="button"></button>
     <span class="status" id="upStatus" role="status"></span>
@@ -461,6 +485,7 @@ details.info code{font-size:14px;color:var(--text)}
 (() => {
   const $ = (s) => document.querySelector(s);
   const P = 'fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"';
+  const PF = P.replace('fill="none"', 'fill="currentColor"');
   const ICONS = {
     plus:`<svg viewBox="0 0 24 24" ${P}><path d="M12 5v14M5 12h14"/></svg>`,
     heart:`<svg viewBox="0 0 24 24" ${P}><path d="M12 20s-7-4.6-9-9.2C1.7 7.6 3.6 4.5 6.8 4.5c2 0 3.4 1 5.2 3 1.8-2 3.2-3 5.2-3 3.2 0 5.1 3.1 3.8 6.3C19 15.4 12 20 12 20z"/></svg>`,
@@ -477,14 +502,18 @@ details.info code{font-size:14px;color:var(--text)}
     pencil:`<svg viewBox="0 0 24 24" ${P}><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg>`,
     chev:`<svg viewBox="0 0 24 24" ${P}><path d="M6 9l6 6 6-6"/></svg>`,
     next:`<svg viewBox="0 0 24 24" ${P}><path d="M9 5l7 7-7 7"/></svg>`,
-    info:`<svg viewBox="0 0 24 24" ${P}><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 7.6h.01"/></svg>`
+    info:`<svg viewBox="0 0 24 24" ${P}><circle cx="12" cy="12" r="9"/><path d="M12 11v5.5M12 7.6h.01"/></svg>`,
+    play:`<svg viewBox="0 0 24 24" ${PF}><path d="M8 5.5v13L19 12z"/></svg>`,
+    pause:`<svg viewBox="0 0 24 24" ${PF}><rect x="6.5" y="5" width="4" height="14" rx="1"/><rect x="13.5" y="5" width="4" height="14" rx="1"/></svg>`,
+    expand:`<svg viewBox="0 0 24 24" ${P}><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>`,
+    video:`<svg viewBox="0 0 24 24" ${P}><rect x="3" y="6" width="13" height="12" rx="3"/><path d="M16 10.5l5-3v9l-5-3z"/></svg>`
   };
-  const EXT = {"image/png":"png","image/jpeg":"jpg","image/gif":"gif","image/webp":"webp","image/svg+xml":"svg"};
-  const BY_EXT = {png:"image/png",jpg:"image/jpeg",jpeg:"image/jpeg",gif:"image/gif",webp:"image/webp",svg:"image/svg+xml"};
+  const EXT = {"image/png":"png","image/jpeg":"jpg","image/gif":"gif","image/webp":"webp","image/svg+xml":"svg","video/mp4":"mp4","video/webm":"webm","video/quicktime":"mov"};
+  const BY_EXT = {png:"image/png",jpg:"image/jpeg",jpeg:"image/jpeg",gif:"image/gif",webp:"image/webp",svg:"image/svg+xml",mp4:"video/mp4",m4v:"video/mp4",webm:"video/webm",mov:"video/quicktime"};
   // Same key as before, so a device that is already connected stays connected.
   const LS = "visualsLibrary.v1";
   const CACHE = "visuals-cache-v1";
-  const MAX_BYTES = 25 * 1024 * 1024;
+  const MAX_IMG = 25 * 1024 * 1024, MAX_VID = 50 * 1024 * 1024;
 
   // ---------- config ----------
   function detect(){
@@ -502,7 +531,7 @@ details.info code{font-size:14px;color:var(--text)}
   let canEdit = !!(cfg.token && cfg.owner && cfg.repo);
 
   const state = {
-    items:[], folders:[], folder:null, tag:null, fav:false, q:"", loaded:false, error:null,
+    items:[], folders:[], folder:null, tag:null, fav:false, vid:false, q:"", loaded:false, error:null,
     openId:null, pending:[], uploading:false, sha:null, sync:"saved", select:false, sel:new Set()
   };
   const deleted = {items:new Set(), folders:new Set()};   // remembered so a merge can't bring them back
@@ -557,7 +586,20 @@ details.info code{font-size:14px;color:var(--text)}
   const findFolder = (id) => id ? state.folders.find((f) => f.id === id) || null : null;
   const folderName = (id) => { const f = findFolder(id); return f ? f.name : ""; };
   const countIn = (id) => state.items.reduce((n, i) => n + ((i.folder || null) === id ? 1 : 0), 0);
-  const isFiltering = () => !!(state.q.trim() || state.tag || state.fav);
+  const isFiltering = () => !!(state.q.trim() || state.tag || state.fav || state.vid);
+  const isVideoType = (t) => /^video\//.test(t || "");
+  const isVideo = (it) => !!it && isVideoType(it.type);
+  const limitFor = (t) => isVideoType(t) ? MAX_VID : MAX_IMG;
+  function itemsLabel(list){
+    const n = list.length, v = list.filter(isVideo).length;
+    return !v ? plural(n, "image", "images") : v === n ? plural(n, "video", "videos") : plural(n, "item", "items");
+  }
+  function fmtTime(sec){
+    sec = Math.max(0, Math.floor(Number(sec) || 0));
+    const m = Math.floor(sec / 60), s = sec % 60, hr = Math.floor(m / 60);
+    return hr ? hr + ":" + String(m % 60).padStart(2, "0") + ":" + String(s).padStart(2, "0") : m + ":" + String(s).padStart(2, "0");
+  }
+  const fmtSize = (b) => b >= 1048576 ? (b / 1048576).toFixed(b >= 10485760 ? 0 : 1) + " MB" : Math.max(1, Math.round(b / 1024)) + " KB";
 
   // ---------- image loading (with a cache that survives reloads) ----------
   const cacheKey = (path) => "https://visuals.local/" + enc(cfg.owner + "/" + cfg.repo) + "/" + path;
@@ -584,7 +626,16 @@ details.info code{font-size:14px;color:var(--text)}
   }
   function queue(fn, urgent){ return new Promise((res, rej) => { const job = () => fn().then(res, rej); if (urgent) waiting.unshift(job); else waiting.push(job); pump(); }); }
   const pathFor = (it, thumb) => thumb && it.thumb ? "thumbs/" + it.thumb : "images/" + it.file;
-  const peek = (it, thumb) => it._url || urlCache.get(pathFor(it, thumb)) || null;
+  const videoUrls = new Map(), videoJobs = new Map();   // videos are big, so only the last two stay in memory
+  const peek = (it, thumb) => {
+    if (thumb){
+      if (it._turl) return it._turl;
+      if (isVideo(it)) return it.thumb ? urlCache.get("thumbs/" + it.thumb) || null : null;
+      return it._url || urlCache.get(pathFor(it, true)) || null;
+    }
+    if (isVideo(it)) return it._url || videoUrls.get("images/" + it.file) || null;
+    return it._url || urlCache.get(pathFor(it, false)) || null;
+  };
   function fetchBlobUrl(path, urgent){
     if (urlCache.has(path)) return Promise.resolve(urlCache.get(path));
     return queue(async () => {
@@ -603,7 +654,52 @@ details.info code{font-size:14px;color:var(--text)}
     }, urgent);
   }
   function getUrl(it, thumb, urgent){
+    if (isVideo(it)){
+      if (!thumb) return fetchVideoUrl(it);
+      if (it._turl) return Promise.resolve(it._turl);
+      if (!it.thumb) return Promise.reject(new Error("no poster"));
+      return fetchBlobUrl("thumbs/" + it.thumb, urgent);
+    }
     return it._url ? Promise.resolve(it._url) : fetchBlobUrl(pathFor(it, thumb), urgent);
+  }
+  function rememberVideo(path, url){
+    videoUrls.set(path, url);
+    while (videoUrls.size > 2){
+      const [k, u] = videoUrls.entries().next().value;
+      videoUrls.delete(k);
+      vScroll().querySelectorAll(".slide[data-vpath]").forEach((sl) => { if (sl.dataset.vpath === k) resetVideoSlide(sl); });
+      URL.revokeObjectURL(u);
+    }
+  }
+  // Downloads a whole video (with progress) so it can play and seek from a local blob.
+  function fetchVideoUrl(it, onProgress){
+    if (it._url) return Promise.resolve(it._url);
+    const path = "images/" + it.file, hit = videoUrls.get(path);
+    if (hit){ videoUrls.delete(path); videoUrls.set(path, hit); return Promise.resolve(hit); }
+    if (videoJobs.has(path)) return videoJobs.get(path);
+    const job = (async () => {
+      const res = await fetch(`https://api.github.com/repos/${cfg.owner}/${cfg.repo}/contents/${path}?ref=${enc(cfg.branch)}`,
+        {headers:{"Accept":"application/vnd.github.raw+json","X-GitHub-Api-Version":"2022-11-28","Authorization":"Bearer " + cfg.token}});
+      if (!res.ok) throw new Error("status " + res.status);
+      let blob;
+      if (res.body && res.body.getReader){
+        const total = Number(res.headers.get("content-length")) || it.size || 0;
+        const reader = res.body.getReader(), parts = []; let got = 0;
+        for (;;){
+          const {done, value} = await reader.read();
+          if (done) break;
+          parts.push(value); got += value.length;
+          if (total && onProgress) onProgress(Math.min(1, got / total));
+        }
+        blob = new Blob(parts, {type: mimeOf(path)});
+      } else blob = new Blob([await res.arrayBuffer()], {type: mimeOf(path)});
+      const url = URL.createObjectURL(blob);
+      rememberVideo(path, url);
+      return url;
+    })();
+    videoJobs.set(path, job);
+    job.then(() => videoJobs.delete(path), () => videoJobs.delete(path));
+    return job;
   }
   const io = "IntersectionObserver" in window
     ? new IntersectionObserver((entries) => {
@@ -611,6 +707,7 @@ details.info code{font-size:14px;color:var(--text)}
       }, {rootMargin:"300px"})
     : null;
   function lazyImg(it, alt){
+    if (isVideo(it) && !it.thumb && !it._turl) return icon("video");   // no poster frame: show a video icon, never the file itself
     const img = h("img", {alt, decoding:"async"});
     const now = peek(it, true);
     if (now){ img.src = now; return img; }   // already have it: no blank flash when the grid redraws
@@ -630,13 +727,13 @@ details.info code{font-size:14px;color:var(--text)}
   function blobB64(blob){
     return new Promise((res, rej) => {
       const r = new FileReader();
-      r.onload = () => res(String(r.result).split(",")[1]);
+      r.onload = () => { const d = String(r.result); res(d.slice(d.indexOf(",") + 1)); };
       r.onerror = () => rej(r.error);
       r.readAsDataURL(blob);
     });
   }
   async function shrink(file, type, max = 2400){
-    if (type === "image/gif" || type === "image/svg+xml") return file;
+    if (isVideoType(type) || type === "image/gif" || type === "image/svg+xml") return file;
     try {
       const bmp = await createImageBitmap(file);
       const s = Math.min(1, max / Math.max(bmp.width, bmp.height));
@@ -672,7 +769,7 @@ details.info code{font-size:14px;color:var(--text)}
     }
   }
   const clean = (it) => ({id:it.id, file:it.file, name:it.name, tags:it.tags || [], fav:!!it.fav, folder:it.folder || null,
-    createdAt:it.createdAt, size:it.size, type:it.type, sha:it.sha, thumb:it.thumb});
+    createdAt:it.createdAt, size:it.size, type:it.type, sha:it.sha, thumb:it.thumb, dur:it.dur});
   function norm(data){
     const d = data && typeof data === "object" ? data : {};
     const folders = (Array.isArray(d.folders) ? d.folders : [])
@@ -805,7 +902,7 @@ details.info code{font-size:14px;color:var(--text)}
     const m = /^#f=([a-z0-9]+)$/i.exec(location.hash);
     const id = m && findFolder(m[1]) ? m[1] : null;
     if (id !== state.folder){
-      state.tag = null; state.fav = false; state.q = ""; $("#q").value = "";
+      state.tag = null; state.fav = false; state.vid = false; state.q = ""; $("#q").value = "";
       exitSelect();
     }
     state.folder = id;
@@ -828,6 +925,7 @@ details.info code{font-size:14px;color:var(--text)}
       if (state.folder){ if (it.folder !== state.folder) return false; }
       else if (!filtering && it.folder) return false;
       if (state.fav && !it.fav) return false;
+      if (state.vid && !isVideo(it)) return false;
       if (state.tag && !(it.tags || []).includes(state.tag)) return false;
       const hay = ((it.name || "") + " " + (it.tags || []).join(" ") + " " + folderName(it.folder)).toLowerCase();
       return tokens.every((t) => hay.includes(t));
@@ -849,10 +947,11 @@ details.info code{font-size:14px;color:var(--text)}
     let text;
     if (!state.loaded) text = "Loading your library…";
     else if (state.error) text = "Couldn't load your library";
-    else if (f){ const n = countIn(f.id); text = n ? plural(n, "image", "images") : "Empty folder"; }
+    else if (f){ const own = state.items.filter((i) => i.folder === f.id); text = own.length ? itemsLabel(own) : "Empty folder"; }
     else {
-      const n = state.items.length, k = state.folders.length, parts = [];
-      if (n) parts.push(plural(n, "image", "images"));
+      const n = state.items.length, k = state.folders.length, v = state.items.filter(isVideo).length, parts = [];
+      if (n - v) parts.push(plural(n - v, "image", "images"));
+      if (v) parts.push(plural(v, "video", "videos"));
       if (k) parts.push(plural(k, "folder", "folders"));
       text = parts.length ? parts.join(", ") : "Nothing here yet";
     }
@@ -864,12 +963,16 @@ details.info code{font-size:14px;color:var(--text)}
     const scope = scopeItems();
     const counts = tagCounts(scope);
     if (state.tag && !counts.some(([t]) => t === state.tag)) state.tag = null;
+    const hasVid = scope.some(isVideo);
+    if (state.vid && !hasVid) state.vid = false;
     box.hidden = !state.loaded || scope.length === 0;
-    const reset = () => { state.tag = null; state.fav = false; render(); };
+    const reset = () => { state.tag = null; state.fav = false; state.vid = false; render(); };
     box.replaceChildren(
-      h("button", {class:"chip", type:"button", "aria-pressed": String(!state.tag && !state.fav), text:"All", onclick:reset}),
+      h("button", {class:"chip", type:"button", "aria-pressed": String(!state.tag && !state.fav && !state.vid), text:"All", onclick:reset}),
       h("button", {class:"chip", type:"button", "aria-pressed": String(state.fav),
         onclick:() => { state.fav = !state.fav; render(); }}, icon("heart"), "Favorites"),
+      ...(hasVid ? [h("button", {class:"chip", type:"button", "aria-pressed": String(state.vid),
+        onclick:() => { state.vid = !state.vid; render(); }}, icon("video"), "Videos")] : []),
       ...counts.map(([t, n]) => h("button", {class:"chip", type:"button", "aria-pressed": String(state.tag === t),
         onclick:() => { state.tag = state.tag === t ? null : t; render(); }}, t, h("small", {text:String(n)})))
     );
@@ -883,10 +986,10 @@ details.info code{font-size:14px;color:var(--text)}
       ? h("div", {class:"thumb mosaic n" + Math.min(n, 4)}, shown.map((it) => h("div", {class:"cell"}, lazyImg(it, ""))))
       : h("div", {class:"thumb none"}, icon("folder"));
     return h("div", {class:"tile"},
-      h("button", {class:"open", type:"button", "aria-label":"Open folder " + f.name + ", " + plural(n, "image", "images"), onclick:() => navigate(f.id)},
+      h("button", {class:"open", type:"button", "aria-label":"Open folder " + f.name + ", " + itemsLabel(list), onclick:() => navigate(f.id)},
         thumb,
         h("div", {class:"name", text:f.name}),
-        h("div", {class:"sub", text: n ? plural(n, "image", "images") : "Empty"})));
+        h("div", {class:"sub", text: n ? itemsLabel(list) : "Empty"})));
   }
   function renderFolders(){
     const sec = $("#foldersSec");
@@ -898,14 +1001,15 @@ details.info code{font-size:14px;color:var(--text)}
     $("#folderGrid").hidden = state.folders.length === 0;
     $("#folderGrid").replaceChildren(...state.folders.map(folderTile));
   }
+  function vbadge(it){ return h("span", {class:"vbadge"}, icon("play"), it.dur ? h("span", {text:fmtTime(it.dur)}) : null); }
   function tile(it){
     const sel = state.select && state.sel.has(it.id);
     const label = !state.folder && it.folder ? folderName(it.folder) : "";
     const kids = [
-      h("button", {class:"open", type:"button", "aria-label":(state.select ? "Select " : "Open ") + (it.name || "image"),
+      h("button", {class:"open", type:"button", "aria-label":(state.select ? "Select " : "Open ") + (isVideo(it) ? "video " : "") + (it.name || "image"),
         "aria-pressed": state.select ? String(sel) : null,
         onclick:() => state.select ? toggleSel(it.id) : openViewer(it.id)},
-        h("div", {class:"thumb"}, lazyImg(it, it.name || "")),
+        h("div", {class:"thumb"}, lazyImg(it, it.name || ""), isVideo(it) ? vbadge(it) : null),
         h("div", {class:"name", text:it.name || "Untitled"}),
         label ? h("div", {class:"sub"}, icon("folder"), h("span", {text:label})) : null)
     ];
@@ -915,8 +1019,9 @@ details.info code{font-size:14px;color:var(--text)}
       onclick:(e) => { e.stopPropagation(); patch(it.id, {fav: !it.fav}); }}, icon("heart")));
     return h("div", {class:"tile" + (sel ? " sel" : "")}, kids);
   }
-  function clearFilters(){ state.q = ""; state.tag = null; state.fav = false; $("#q").value = ""; render(); }
-  function addBtn(){ return h("button", {class:"btn", type:"button", onclick:() => $("#file").click()}, icon("plus"), "Add images"); }
+  function clearFilters(){ state.q = ""; state.tag = null; state.fav = false; state.vid = false; $("#q").value = ""; render(); }
+  function addBtn(){ return h("button", {class:"btn", type:"button", onclick:() => $("#file").click()}, icon("plus"), "Add images or videos"); }
+  const kindTitle = (list) => list.some(isVideo) ? (list.every(isVideo) ? "Videos" : "Images and videos") : "Images";
   function renderGrid(){
     const grid = $("#grid"), empty = $("#empty"), sec = $("#imagesSec");
     const list = visible();
@@ -926,8 +1031,8 @@ details.info code{font-size:14px;color:var(--text)}
     empty.hidden = list.length > 0;
     if (list.length){
       $("#imagesTitle").textContent = state.select
-        ? (state.sel.size ? plural(state.sel.size, "image", "images") + " selected" : "Tap images to select")
-        : filtering ? "Results" : state.folder ? "Images" : (state.folders.length ? "Unfiled" : "Images");
+        ? (state.sel.size ? itemsLabel([...state.sel].map(find).filter(Boolean)) + " selected" : "Tap to select")
+        : filtering ? "Results" : state.folder ? kindTitle(list) : (state.folders.length ? "Unfiled" : kindTitle(list));
       $("#selectBtn").hidden = !canEdit;
       $("#selectBtn").textContent = !state.select ? "Select" : (list.every((i) => state.sel.has(i.id)) ? "Clear" : "Select all");
       return;
@@ -945,10 +1050,10 @@ details.info code{font-size:14px;color:var(--text)}
       empty.replaceChildren(icon("search"), h("h2", {text:"No matches"}), h("p", {text:"Try a different word or tag."}),
         h("div", {class:"emptyrow"}, h("button", {class:"btn", type:"button", text:"Clear filters", onclick:clearFilters})));
     } else if (state.folder){
-      empty.replaceChildren(icon("folder"), h("h2", {text:"This folder is empty"}), h("p", {text:"Add images here, or move some in from your library."}),
+      empty.replaceChildren(icon("folder"), h("h2", {text:"This folder is empty"}), h("p", {text:"Add files here, or move some in from your library."}),
         h("div", {class:"emptyrow"}, addBtn()));
     } else if (state.items.length === 0){
-      empty.replaceChildren(icon("image"), h("h2", {text:"Your library is empty"}), h("p", {text:"Add images now, or make a folder first."}),
+      empty.replaceChildren(icon("image"), h("h2", {text:"Your library is empty"}), h("p", {text:"Add images or videos now, or make a folder first."}),
         h("div", {class:"emptyrow"}, addBtn(),
           h("button", {class:"btn", type:"button", onclick:() => openFolderSheet({mode:"new"})}, icon("folderplus"), "New folder")));
     } else {
@@ -1078,19 +1183,19 @@ details.info code{font-size:14px;color:var(--text)}
     folderCtx = null; closeTop();
     if (state.folder === id) navigate(null); else render();
     refreshDetail(); scheduleSave();
-    toast(n ? "Folder deleted. " + plural(n, "image is", "images are") + " now unfiled." : "Folder deleted");
+    toast(n ? "Folder deleted. " + plural(n, "item is", "items are") + " now unfiled." : "Folder deleted");
   }
   function openMove(ids){
     const items = ids.map(find).filter(Boolean);
     if (!items.length) return;
     const cur = new Set(items.map((i) => i.folder || null));
     const only = cur.size === 1 ? [...cur][0] : undefined;
-    $("#mTitle").textContent = "Move " + plural(items.length, "image", "images") + " to";
+    $("#mTitle").textContent = "Move " + itemsLabel(items) + " to";
     const go = (id) => {
       closeTop(); exitSelect();
       const n = moveItems(items.map((i) => i.id), id);
       render();
-      toast(n ? "Moved " + plural(n, "image", "images") + " to " + (id ? folderName(id) : "Unfiled") : "Already there");
+      toast(n ? "Moved " + (n === items.length ? itemsLabel(items) : plural(n, "item", "items")) + " to " + (id ? folderName(id) : "Unfiled") : "Already there");
     };
     const row = (label, count, id, ico) => h("button", {class:"row", type:"button", "aria-pressed": String(only === id), onclick:() => go(id)},
       icon(ico), h("span", {class:"rl", text:label}), h("small", {text:String(count)}));
@@ -1099,7 +1204,7 @@ details.info code{font-size:14px;color:var(--text)}
       ...state.folders.map((f) => row(f.name, countIn(f.id), f.id, "folder")),
       h("button", {class:"row", type:"button", onclick:() => {
         closeTop();
-        openFolderSheet({mode:"new", then:(id) => { exitSelect(); const n = moveItems(items.map((i) => i.id), id); render(); if (n) toast("Moved " + plural(n, "image", "images") + " to " + folderName(id)); }});
+        openFolderSheet({mode:"new", then:(id) => { exitSelect(); const n = moveItems(items.map((i) => i.id), id); render(); if (n) toast("Moved " + (n === items.length ? itemsLabel(items) : plural(n, "item", "items")) + " to " + folderName(id)); }});
       }}, icon("folderplus"), h("span", {class:"rl", text:"New folder…"})));
     openTop("#moveSheet");
   }
@@ -1117,7 +1222,10 @@ details.info code{font-size:14px;color:var(--text)}
     img.removeAttribute("src"); img.alt = it.name || "";
     const small = peek(it, true);
     if (small) img.src = small;   // show the preview instantly while the full image loads
-    getUrl(it, false).then((u) => { if (state.openId === it.id) img.src = u; }, () => { if (!small) toast("Couldn't load this image."); });
+    img.hidden = isVideo(it) && !small;
+    if (isVideo(it)){
+      if (it.thumb && !small) getUrl(it, true).then((u) => { if (state.openId === it.id){ img.src = u; img.hidden = false; } }, () => {});
+    } else getUrl(it, false).then((u) => { if (state.openId === it.id) img.src = u; }, () => { if (!small) toast("Couldn't load this image."); });
     $("#dName").value = it.name || "";
     $("#dName").readOnly = !canEdit;
     $("#dAddRow").hidden = !canEdit;
@@ -1157,11 +1265,12 @@ details.info code{font-size:14px;color:var(--text)}
   async function download(id){
     const it = find(id); if (!it) return;
     try {
+      if (isVideo(it) && !peek(it, false)) toast("Getting the video…");
       const a = document.createElement("a");
       a.href = await getUrl(it, false);
       a.download = safeName(it.name) + "." + (it.file.split(".").pop() || "png");
       document.body.append(a); a.click(); a.remove();
-    } catch (e) { toast("Couldn't download this image."); }
+    } catch (e) { toast("Couldn't download this file."); }
   }
   function remove(){
     const it = find(state.openId); if (!it || !canEdit) return;
@@ -1182,7 +1291,7 @@ details.info code{font-size:14px;color:var(--text)}
       if (it.thumb) pendingDel.push({path:"contents/thumbs/" + it.thumb});
     }
     closeSheets(); render();
-    toast(list.length === 1 ? "Deleted" : plural(list.length, "image", "images") + " deleted");
+    toast(list.length === 1 ? "Deleted" : itemsLabel(list) + " deleted");
     return flushSave();
   }
 
@@ -1201,6 +1310,41 @@ details.info code{font-size:14px;color:var(--text)}
       return {blob, ext: blob.type === "image/png" ? "png" : "webp"};
     } catch (e) { return null; }
   }
+  // Grabs the length and a poster frame from a video, right in the browser.
+  function videoInfo(file){
+    return new Promise((resolve) => {
+      const url = URL.createObjectURL(file);
+      const v = document.createElement("video");
+      v.muted = true; v.preload = "metadata"; v.playsInline = true;
+      let dur = 0, done = false, timer;
+      const finish = (thumb) => {
+        if (done) return; done = true; clearTimeout(timer);
+        v.onerror = v.onloadedmetadata = v.onseeked = null;
+        try { v.removeAttribute("src"); v.load(); } catch (e) {}
+        URL.revokeObjectURL(url);
+        resolve({dur, thumb: thumb || null});
+      };
+      timer = setTimeout(() => finish(null), 10000);
+      v.onerror = () => finish(null);
+      v.onloadedmetadata = () => {
+        dur = isFinite(v.duration) ? v.duration : 0;
+        try { v.currentTime = Math.min(1, dur * 0.1 || 0.1); } catch (e) { finish(null); }
+      };
+      v.onseeked = async () => {
+        try {
+          const w = v.videoWidth, hh = v.videoHeight;
+          if (!w || !hh) return finish(null);
+          const sc = Math.min(1, 480 / Math.max(w, hh));
+          const c = document.createElement("canvas");
+          c.width = Math.max(1, Math.round(w * sc)); c.height = Math.max(1, Math.round(hh * sc));
+          c.getContext("2d").drawImage(v, 0, 0, c.width, c.height);
+          const blob = await new Promise((r) => c.toBlob(r, "image/webp", 0.85));
+          finish(blob ? {blob, ext: blob.type === "image/png" ? "png" : "webp"} : null);
+        } catch (e) { finish(null); }
+      };
+      v.src = url;
+    });
+  }
   function normType(f){
     if (EXT[f.type]) return f.type;
     const m = /\.([a-z0-9]+)$/i.exec(f.name || "");
@@ -1210,21 +1354,24 @@ details.info code{font-size:14px;color:var(--text)}
     if (!canEdit || state.uploading) return;
     const ok = [], bad = [];
     for (const f of files){ const type = normType(f); if (type) ok.push({file:f, type}); else bad.push(f); }
-    if (bad.length) toast(plural(bad.length, "file", "files") + " skipped. Use PNG, JPG, GIF, WebP or SVG.");
+    if (bad.length) toast(plural(bad.length, "file", "files") + " skipped. Use PNG, JPG, GIF, WebP, SVG, MP4, WebM or MOV.");
     if (ok.length) openUpload(ok);
   }
   function openUpload(list){
     previewUrls.forEach((u) => URL.revokeObjectURL(u));
     state.pending = list;
     const n = list.length;
-    $("#upTitle").textContent = n === 1 ? "Add 1 image" : "Add " + n + " images";
+    $("#upTitle").textContent = "Add " + itemsLabel(list);
+    $("#upVidNote").hidden = !list.some((p) => isVideoType(p.type));
     $("#upTags").value = "";
     $("#upStatus").textContent = "";
     $("#upGo").disabled = false;
-    $("#upGo").replaceChildren(icon("plus"), n === 1 ? "Upload image" : "Upload " + n + " images");
+    $("#upGo").replaceChildren(icon("plus"), "Upload " + itemsLabel(list));
     fillFolderSelect($("#upFolder"), state.folder || "");
     previewUrls = list.map((p) => URL.createObjectURL(p.file));
-    $("#upStrip").replaceChildren(...previewUrls.map((u) => h("div", {class:"sm"}, h("img", {src:u, alt:""}))));
+    $("#upStrip").replaceChildren(...previewUrls.map((u, k) => h("div", {class:"sm"}, isVideoType(list[k].type)
+      ? h("video", {src:u + "#t=0.1", muted:true, playsinline:true, preload:"metadata"})
+      : h("img", {src:u, alt:""}))));
     $("#upSuggest").replaceChildren(...tagCounts(state.items).slice(0, 8).map(([t]) => h("button", {class:"chip", type:"button", text:t, onclick:() => {
       const cur = parseTags($("#upTags").value);
       if (!cur.includes(t)) cur.push(t);
@@ -1242,11 +1389,11 @@ details.info code{font-size:14px;color:var(--text)}
     state.uploading = true; $("#upGo").disabled = true; $("#upClose").disabled = true;
     const added = []; let failed = 0, tooBig = 0, slow = 0, fatal = null;
     for (let i = 0; i < n; i++){
-      $("#upStatus").textContent = "Uploading " + (i + 1) + " of " + n + "…";
       const {file, type} = list[i];
+      $("#upStatus").textContent = "Uploading " + (i + 1) + " of " + n + "…" + (isVideoType(type) ? " (videos can take a minute)" : "");
       try {
         const blob = doShrink ? await shrink(file, type) : file;
-        if (blob.size > MAX_BYTES){ tooBig++; continue; }
+        if (blob.size > limitFor(type)){ tooBig++; continue; }
         const id = uid();
         const name = slug(file.name) + "-" + id + "." + EXT[type];
         const r = await ghWrite("PUT", "contents/images/" + name, {message:"Add " + name, branch:cfg.branch, content: await blobB64(blob)});
@@ -1255,14 +1402,15 @@ details.info code{font-size:14px;color:var(--text)}
           if (r.limited) slow++;
           failed++; continue;
         }
-        let thumb;
-        const t = await makeThumb(blob, type);
+        let thumb, dur, t;
+        if (isVideoType(type)){ const info = await videoInfo(blob); t = info.thumb; if (info.dur) dur = Math.round(info.dur * 10) / 10; }
+        else t = await makeThumb(blob, type);
         if (t){
           const tn = name.replace(/\.[^.]+$/, "") + "." + t.ext;
           const tr = await ghWrite("PUT", "contents/thumbs/" + tn, {message:"Add thumbnail " + tn, branch:cfg.branch, content: await blobB64(t.blob)});
           if (tr.ok) thumb = tn;
         }
-        added.push({id, file:name, name:baseName(file.name), tags, fav:false, folder, createdAt:Date.now() + (n - i), size:blob.size, type, sha:r.json.content.sha, thumb, _url:URL.createObjectURL(blob)});
+        added.push({id, file:name, name:baseName(file.name), tags, fav:false, folder, createdAt:Date.now() + (n - i), size:blob.size, type, sha:r.json.content.sha, thumb, dur, _url:URL.createObjectURL(blob), _turl: t ? URL.createObjectURL(t.blob) : undefined});
       } catch (e) { failed++; }
     }
     state.uploading = false; $("#upClose").disabled = false;
@@ -1271,8 +1419,8 @@ details.info code{font-size:14px;color:var(--text)}
       closeSheets(); render();
       flushSave();
     } else closeSheets();
-    let msg = added.length ? plural(added.length, "image", "images") + " added" + (folder ? " to " + folderName(folder) : "") : "Nothing was added";
-    if (tooBig) msg += ". " + plural(tooBig, "file was", "files were") + " over 25 MB.";
+    let msg = added.length ? itemsLabel(added) + " added" + (folder ? " to " + folderName(folder) : "") : "Nothing was added";
+    if (tooBig) msg += ". " + plural(tooBig, "file was", "files were") + " over the size limit (25 MB images, 50 MB videos).";
     if (failed) msg += ". " + failed + (fatal ? " failed: " + (fatal === 404 ? "repo not found, check settings." : "token lacks write access.")
       : slow ? " were slowed down by GitHub. Try those again in a minute." : " didn't upload.");
     toast(msg);
@@ -1289,6 +1437,7 @@ details.info code{font-size:14px;color:var(--text)}
   function ensureSlide(i, full){
     const slide = vScroll().children[i], it = find(viewer.ids[i]);
     if (!slide || !it) return;
+    if (isVideo(it)){ ensureVideoSlide(slide, it); return; }
     let img = slide.firstElementChild;
     if (!img){ img = h("img", {alt: it.name || "", decoding:"async", draggable:"false"}); slide.append(img); }
     if (img.dataset.q === "full") return;
@@ -1313,6 +1462,7 @@ details.info code{font-size:14px;color:var(--text)}
     $("#vPrev").disabled = i <= 0; $("#vNext").disabled = i >= n - 1;
     ensureSlide(i, true);
     ensureSlide(i - 1, true); ensureSlide(i + 1, true);   // neighbours are ready before you swipe
+    pauseOthers();
   }
   function openViewer(id){
     const ids = visible().map((i) => i.id), idx = ids.indexOf(id);
@@ -1331,6 +1481,7 @@ details.info code{font-size:14px;color:var(--text)}
     if (!viewer.open) return;
     viewer.open = false; viewer.pushed = false;
     $("#viewer").hidden = true;
+    vScroll().querySelectorAll("video").forEach((v) => v.pause());
     vScroll().replaceChildren();
     closeSheets();
     if ($("#backdrop").hidden) document.body.classList.remove("lock");
@@ -1348,6 +1499,89 @@ details.info code{font-size:14px;color:var(--text)}
     const left = t * sc.clientWidth;
     if (sc.scrollTo) sc.scrollTo({left, behavior: reduceMotion() ? "auto" : "smooth"}); else sc.scrollLeft = left;
   }
+  // ---- videos in the viewer: tap play to fetch the video, then play it with simple controls ----
+  function pauseOthers(){
+    const cur = vScroll().children[viewer.idx];
+    vScroll().querySelectorAll("video").forEach((v) => { if (v.closest(".slide") !== cur && !v.paused) v.pause(); });
+  }
+  function ensureVideoSlide(slide, it){
+    if (slide.dataset.kind) return;
+    slide.dataset.kind = "video";
+    const hint = h("div", {class:"vhint", text: [it.size ? fmtSize(it.size) : "", it.dur ? fmtTime(it.dur) : ""].filter(Boolean).join(", ") || "Video"});
+    const btn = h("button", {class:"round big vplay", type:"button", "aria-label":"Play video"}, icon("play"));
+    const box = h("div", {class:"vposter"});
+    if (it.thumb || it._turl){
+      const img = h("img", {alt: it.name || "", decoding:"async"});
+      getUrl(it, true).then((u) => { img.src = u; }, () => {});
+      box.append(img);
+    }
+    box.append(h("div", {class:"vover"}, btn, hint));
+    box.addEventListener("click", () => startVideo(slide, it, btn, hint));
+    slide.replaceChildren(box);
+  }
+  function resetVideoSlide(slide){
+    const v = slide.querySelector("video");
+    if (v){ v.pause(); v.removeAttribute("src"); try { v.load(); } catch (e) {} }
+    delete slide.dataset.kind; delete slide.dataset.vpath; delete slide.dataset.loading;
+    const it = find(viewer.ids[[...vScroll().children].indexOf(slide)]);
+    if (it) ensureVideoSlide(slide, it);
+  }
+  async function startVideo(slide, it, btn, hint){
+    if (slide.dataset.loading) return;
+    slide.dataset.loading = "1"; btn.disabled = true; hint.textContent = "Loading…";
+    try {
+      const url = await fetchVideoUrl(it, (p) => { hint.textContent = "Loading " + Math.round(p * 100) + "%"; });
+      delete slide.dataset.loading;
+      if (slide.isConnected) buildPlayer(slide, it, url);
+    } catch (e) {
+      delete slide.dataset.loading; btn.disabled = false; hint.textContent = "Couldn't load. Tap to retry";
+    }
+  }
+  function buildPlayer(slide, it, url){
+    slide.dataset.vpath = "images/" + it.file;
+    const v = h("video", {src:url, playsinline:true, preload:"metadata", "aria-label": it.name || "Video"});
+    const poster = peek(it, true); if (poster) v.poster = poster;
+    const play = h("button", {class:"round", type:"button", "aria-label":"Play"}, icon("play"));
+    const seek = h("input", {type:"range", min:"0", max:"1000", step:"1", value:"0", "aria-label":"Seek"});
+    const time = h("span", {class:"vtime", text:"0:00"});
+    const fs = h("button", {class:"round", type:"button", "aria-label":"Full screen"}, icon("expand"));
+    const wrap = h("div", {class:"vwrap"}, v, h("div", {class:"vctrl"}, play, seek, time, fs));
+    slide.replaceChildren(wrap);
+    let dragging = false;
+    const total = () => isFinite(v.duration) && v.duration > 0 ? v.duration : (it.dur || 0);
+    const paint = () => {
+      const d = total();
+      if (!dragging) seek.value = d ? String(Math.round((v.currentTime / d) * 1000)) : "0";
+      time.textContent = fmtTime(v.currentTime) + " / " + fmtTime(d);
+    };
+    const setIcon = () => { play.replaceChildren(icon(v.paused ? "play" : "pause")); play.setAttribute("aria-label", v.paused ? "Play" : "Pause"); };
+    const toggle = () => { if (v.paused){ const pr = v.play(); if (pr && pr.catch) pr.catch(() => {}); } else v.pause(); };
+    v.addEventListener("click", toggle);
+    play.addEventListener("click", toggle);
+    for (const ev of ["play", "pause", "ended"]) v.addEventListener(ev, setIcon);
+    v.addEventListener("timeupdate", paint); v.addEventListener("loadedmetadata", paint);
+    const endDrag = () => { dragging = false; };
+    seek.addEventListener("pointerdown", () => { dragging = true; });
+    for (const ev of ["pointerup", "pointercancel", "change"]) seek.addEventListener(ev, endDrag);
+    seek.addEventListener("input", () => {
+      const d = total(); if (d) v.currentTime = (Number(seek.value) / 1000) * d;
+      time.textContent = fmtTime(v.currentTime) + " / " + fmtTime(d);
+    });
+    fs.addEventListener("click", () => {
+      if (document.fullscreenElement && document.exitFullscreen){ document.exitFullscreen(); return; }
+      const el = wrap.requestFullscreen || wrap.webkitRequestFullscreen ? wrap : v;
+      const fn = el.requestFullscreen || el.webkitRequestFullscreen || el.webkitEnterFullscreen;
+      if (fn){ try { const pr = fn.call(el); if (pr && pr.catch) pr.catch(() => {}); } catch (e) {} }
+    });
+    v.addEventListener("error", () => {
+      if (!v.getAttribute("src")) return;
+      slide.dataset.kind = "video-error"; delete slide.dataset.vpath;
+      slide.replaceChildren(h("div", {class:"vposter"}, h("div", {class:"vover"}, icon("video"),
+        h("div", {class:"vhint", text:"This browser can't play this video. Use Download instead."}))));
+    });
+    paint(); setIcon(); toggle();
+  }
+
   // if images were deleted while looking at them, close the gap; if none are left, leave
   function syncViewer(){
     if (!viewer.open) return;
@@ -1371,7 +1605,10 @@ details.info code{font-size:14px;color:var(--text)}
       if (viewer.open && i !== viewer.idx){ viewer.idx = i; updateViewer(); }
     });
   }, {passive:true});
-  vScroll().addEventListener("click", () => $("#viewer").classList.toggle("hide-ui"));   // tap to hide or show the controls
+  vScroll().addEventListener("click", (e) => {   // tap to hide or show the controls (videos use taps for play and pause)
+    if (e.target.closest && e.target.closest(".vposter, .vwrap")) return;
+    $("#viewer").classList.toggle("hide-ui");
+  });
   window.addEventListener("resize", () => { if (viewer.open) jumpTo(viewer.idx); });   // keep the same image after rotating
   $("#vClose").addEventListener("click", closeViewer);
   $("#vPrev").addEventListener("click", () => goView(-1));
@@ -1425,6 +1662,7 @@ details.info code{font-size:14px;color:var(--text)}
   function disconnect(){
     cfg.token = ""; saveCfg(); canEdit = false;
     urlCache.forEach((u) => URL.revokeObjectURL(u)); urlCache.clear();
+    videoUrls.forEach((u) => URL.revokeObjectURL(u)); videoUrls.clear();
     try { if (window.caches) caches.delete(CACHE); } catch (e) {}
     state.items = []; state.folders = []; state.folder = null; exitSelect();
     closeSheets(); toast("Disconnected. This device is view-only now.");
