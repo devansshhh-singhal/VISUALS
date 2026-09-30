@@ -452,6 +452,48 @@ button[disabled]{cursor:default}
 #folderShareBtn .ico svg{width:18px;height:18px}
 #folderShareBtn{white-space:nowrap}
 #fShareConfirm:disabled,#fShareRemember:disabled{opacity:.55}
+
+/* Password-encrypted share links, device app lock, leak revocation & visitor login capture */
+.top-actions{display:flex;align-items:center;gap:10px;flex:none}
+.login-gate{
+  position:fixed;inset:0;z-index:55;background:var(--bg);
+  display:grid;place-items:center;padding:22px 16px;overflow-y:auto;
+}
+.login-card{
+  width:100%;max-width:440px;border-radius:28px;background:var(--bg);
+  box-shadow:var(--raise);padding:26px 24px;
+}
+.login-head{display:flex;align-items:center;gap:14px;margin-bottom:10px}
+.login-ico{
+  width:52px;height:52px;border-radius:50%;background:var(--bg);
+  box-shadow:var(--inset);display:grid;place-items:center;color:var(--accent);flex:none;
+}
+.login-ico .ico svg{width:24px;height:24px}
+.login-head h2{margin:0;font-size:22px;font-weight:800;line-height:1.2}
+.login-head p{margin:3px 0 0;font-size:14px;color:var(--muted)}
+.login-notice{
+  margin-top:16px;padding:12px 14px;border-radius:16px;box-shadow:var(--inset);
+  font-size:13px;line-height:1.5;color:var(--muted);
+}
+.sec-section{margin-top:22px;padding-top:18px;border-top:1px solid var(--sd)}
+.sec-section:first-of-type{margin-top:8px;padding-top:0;border-top:0}
+.sec-section h3{margin:0 0 8px;font-size:17px;font-weight:800;display:flex;align-items:center;gap:8px}
+.sec-section h3 .ico svg{width:19px;height:19px;color:var(--accent)}
+.sec-card{
+  padding:14px 16px;border-radius:18px;background:var(--bg);box-shadow:var(--raise-sm);
+  display:flex;flex-direction:column;gap:6px;
+}
+.sec-card.inset{box-shadow:var(--inset)}
+.sec-top{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.sec-who{font-weight:800;font-size:15px;overflow-wrap:anywhere}
+.sec-badge{
+  display:inline-flex;align-items:center;gap:5px;padding:2px 10px;border-radius:999px;
+  box-shadow:var(--inset);font-size:12px;font-weight:800;color:var(--accent);
+}
+.sec-badge.bad{color:var(--danger)}
+.sec-meta{font-size:13px;color:var(--muted);line-height:1.45;overflow-wrap:anywhere}
+.sec-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:10px;align-items:center}
+.no-dl img,.no-dl video{-webkit-touch-callout:none;user-select:none;-webkit-user-select:none}
 </style>
 </head>
 <body>
@@ -466,8 +508,11 @@ button[disabled]{cursor:default}
           <button id="sync" class="sync" type="button" hidden></button>
         </div>
       </div>
-      <button class="round" id="gear" type="button" aria-label="Settings"></button>
-      <button class="round" id="editFolder" type="button" aria-label="Rename or delete this folder" hidden></button>
+      <div class="top-actions">
+        <button class="round" id="lockBtn" type="button" aria-label="Lock library now" title="Lock library now" hidden></button>
+        <button class="round" id="gear" type="button" aria-label="Settings"></button>
+        <button class="round" id="editFolder" type="button" aria-label="Rename or delete this folder" hidden></button>
+      </div>
     </div>
   </header>
 
@@ -482,6 +527,7 @@ button[disabled]{cursor:default}
     <div class="quick-actions">
       <button id="backupBtn" class="btn" type="button"></button>
       <button id="activityBtn" class="btn" type="button"></button>
+      <button id="securityBtn" class="btn" type="button"></button>
       <button id="folderShareBtn" class="btn" type="button" hidden></button>
     </div>
     <p id="backupStatus" class="backup-status" role="status" hidden></p>
@@ -663,6 +709,7 @@ button[disabled]{cursor:default}
   <div class="actions" id="sConnectedActions" style="margin-top:12px" hidden>
     <button class="btn" id="sBackup" type="button">Download full backup (.zip)</button>
     <button class="btn" id="sActivity" type="button">Recent activity</button>
+    <button class="btn" id="sSecurity" type="button">Security, passwords &amp; login logs</button>
   </div>
   <p id="sBackupStatus" class="hint" role="status" hidden></p>
   <details class="info">
@@ -670,7 +717,7 @@ button[disabled]{cursor:default}
     <p>Into your private repo, never the public one. Every image is saved as a commit there.</p>
     <p><code>images/</code> holds the full-size files. <code>thumbs/</code> holds small previews so the grid loads fast. <code>library.json</code> holds names, tags, favorites and folders.</p>
     <p>Folders, subfolders, tags, favorites and custom order live in <code>library.json</code>. Organizing files never re-uploads them.</p>
-    <p>A full backup includes all library files, previews and metadata. Your token is never included. Git history and unrelated repository files are not part of a library backup.</p>
+    <p>A full backup includes all library files, previews, metadata and login logs. Your token is never included. Git history and unrelated repository files are not part of a library backup.</p>
   </details>
 </section>
 
@@ -698,8 +745,8 @@ button[disabled]{cursor:default}
       <strong id="fShareFolderName"></strong>
       <span id="fShareRepo" class="hint" style="display:block;margin:6px 0 0"></span>
     </div>
-    <p id="fShareDemo" class="hint share-warning" hidden>Sample mode previews this form only. Connect your real <b>visuals-data</b> repository to enter a token and create a working link.</p>
-    <p class="hint" style="margin:14px 0 0">You fill in the read-only token here before sharing. The recipient opens your link without entering a token and can view or download this folder and its subfolders.</p>
+    <p id="fShareDemo" class="hint share-warning" hidden>Sample mode previews this form and lets you test encrypted links locally. Connect your real <b>visuals-data</b> repository to share with others.</p>
+    <p class="hint" style="margin:14px 0 0">Protect your shared link with a password (AES-256-GCM encryption). If the link ever gets leaked, nobody can open the folder or extract your token from the URL without the password, and every login is recorded.</p>
     <label class="field">
       <span class="lbl">Read-only GitHub token for this data repository</span>
       <span class="token-entry">
@@ -710,13 +757,49 @@ button[disabled]{cursor:default}
     <p id="fShareTokenHelp" class="hint">Create a <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener noreferrer">fine-grained token</a>: choose <b>Only select repositories</b>, select your data repo (for example <b>visuals-data</b>), and set <b>Repository permissions → Contents → Read-only</b>. Never use the token that connects your editing device.</p>
     <label class="check"><input id="fShareConfirm" type="checkbox">I set this separate token's Contents permission to Read-only.</label>
     <label class="check" style="margin-top:12px"><input id="fShareRemember" type="checkbox" checked>Reuse this sharing token for other folders in this tab only.</label>
-    <p class="hint">The sharing token is not saved in device storage. Uncheck reuse to forget it when this form closes. The access check verifies reading, not the token's read-only permission setting.</p>
+
+    <label class="check" style="margin-top:18px"><input id="fShareUsePass" type="checkbox" checked>Encrypt link &amp; require a password to log in (recommended)</label>
+    <div id="fSharePassFields">
+      <label class="field" style="margin-top:10px">
+        <span class="lbl">Link password (encrypts token with AES-256-GCM)</span>
+        <span class="token-entry">
+          <input id="fSharePass" type="password" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="At least 6 characters">
+          <button id="fSharePassReveal" class="btn small" type="button" aria-pressed="false">Show</button>
+          <button id="fSharePassGen" class="btn small" type="button">Generate</button>
+        </span>
+      </label>
+      <p class="hint">With a password set, the GitHub token inside the link is encrypted with PBKDF2-SHA256 &amp; AES-256-GCM. A leaked link is unreadable without the password.</p>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-top:14px">
+      <label class="field" style="margin-top:0">
+        <span class="lbl">Link expiration</span>
+        <span class="selwrap"><select id="fShareExpiry" aria-label="Link expiration">
+          <option value="0">Never expires</option>
+          <option value="3600000">Expires in 1 hour</option>
+          <option value="86400000">Expires in 24 hours</option>
+          <option value="604800000" selected>Expires in 7 days</option>
+          <option value="2592000000">Expires in 30 days</option>
+          <option value="7776000000">Expires in 90 days</option>
+        </select></span>
+      </label>
+    </div>
+
+    <label class="check" style="margin-top:16px"><input id="fShareRequireName" type="checkbox" checked>Require visitor name/email &amp; collect login data every time somebody logs in</label>
+    <label class="check" style="margin-top:12px"><input id="fShareAllowDl" type="checkbox" checked>Allow visitor to download files or folder .zip (uncheck for view-only protection)</label>
+
+    <label class="field">
+      <span class="lbl">Login capture webhook URL (optional — Discord, Slack or custom HTTPS endpoint)</span>
+      <input id="fShareWebhook" type="url" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="https://discord.com/api/webhooks/… or custom endpoint">
+    </label>
+    <p class="hint">Every login attempt records visitor name, time, folder, device/OS/browser, screen, timezone, language and network info to <code>login-logs.json</code> and/or this webhook.</p>
+
     <label class="field">
       <span class="lbl">Public address of your My Visuals app</span>
       <input id="fShareBase" type="url" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="https://yourname.github.io/my-visuals/" aria-describedby="fShareBaseHelp">
     </label>
-    <p id="fShareBaseHelp" class="hint">Use the trusted address where this app is published, for example on GitHub Pages. Keep <b>visuals-data</b> private. A local HTML file cannot be opened by the person receiving your link.</p>
-    <p id="fSharePrivacy" class="hint share-warning"><b>Important:</b> anyone with the link can recover its token. GitHub tokens are scoped to a repository, not a folder, so recipients can read the <b>entire repo</b> outside this app. Share only with people you trust, or use a separate repository for shared files. Revoke the sharing token on GitHub to disable its links.</p>
+    <p id="fShareBaseHelp" class="hint">Use the trusted address where this app is published, for example on GitHub Pages. Keep <b>visuals-data</b> private.</p>
+    <p id="fSharePrivacy" class="hint share-warning"><b>Leak protection:</b> Password protection encrypts the token inside the link so a leaked link alone cannot be decoded. You can also revoke any link below to block it in the app, or revoke the token on GitHub to cut off API access completely while keeping all data in your repository safe.</p>
     <div id="fShareMsg" class="formmsg" role="status"></div>
     <div class="actions" style="margin-top:12px">
       <button class="btn" id="fShareGo" type="button">Check token &amp; create link</button>
@@ -724,17 +807,24 @@ button[disabled]{cursor:default}
     </div>
     <p id="fZipStatus" class="hint" role="status" hidden></p>
     <div id="fShareOut" class="sharebox generated-share-link" role="textbox" aria-label="Generated shared-folder link" aria-readonly="true" tabindex="0" hidden></div>
-    <div class="copybar" id="fCopyBar" hidden>
-      <button class="btn small" id="fCopyGo" type="button">Copy link</button>
+    <div class="copybar" id="fCopyBar" hidden style="flex-wrap:wrap">
+      <button class="btn small" id="fCopyGo" type="button">Copy link only</button>
+      <button class="btn small" id="fCopyPassGo" type="button" hidden>Copy link + password</button>
       <button class="btn small" id="fSendGo" type="button" hidden>Send link…</button>
+    </div>
+    <div id="fShareActiveBox" class="sec-section" hidden>
+      <h3>Active links for this folder</h3>
+      <p class="hint" style="margin:0 0 10px">If a link gets leaked, revoke it here to block it in the app immediately.</p>
+      <div id="fShareActiveList" class="picklist"></div>
     </div>
   </div>
 </section>
 
 <section id="activitySheet" class="sheet top" role="dialog" aria-modal="true" aria-labelledby="aTitle" hidden>
   <div class="sheethead">
-    <div style="display:flex;align-items:center;gap:12px;min-width:0">
+    <div style="display:flex;align-items:center;gap:12px;min-width:0;flex-wrap:wrap">
       <h2 id="aTitle">Recent activity</h2>
+      <button class="textbtn" id="aOpenLogins" type="button">Login logs</button>
       <button class="textbtn" id="aClear" type="button">Clear</button>
     </div>
     <button class="round" id="aClose" type="button" aria-label="Close"></button>
@@ -742,10 +832,127 @@ button[disabled]{cursor:default}
   <p id="aScope" class="hint" style="margin:0 0 10px">Logged on this device only; not synced to other devices. Check the sync indicator to confirm your edits are saved.</p>
   <div class="activity-controls">
     <input id="aSearch" type="search" aria-label="Search activity" placeholder="Search recent changes" autocomplete="off">
-    <select id="aFilter" aria-label="Filter activity"><option value="all">All activity</option><option value="upload">Uploads</option><option value="edit">Edits</option><option value="folder">Folders</option><option value="delete">Deletions</option><option value="backup">Backups</option><option value="share">Sharing</option></select>
+    <select id="aFilter" aria-label="Filter activity"><option value="all">All activity</option><option value="upload">Uploads</option><option value="edit">Edits</option><option value="folder">Folders</option><option value="delete">Deletions</option><option value="backup">Backups</option><option value="share">Sharing</option><option value="security">Security &amp; logins</option></select>
   </div>
   <div id="activityList" class="picklist"></div>
 </section>
+
+<section id="securitySheet" class="sheet top" role="dialog" aria-modal="true" aria-labelledby="secTitle" hidden>
+  <div class="sheethead">
+    <h2 id="secTitle">Security &amp; Login Logs</h2>
+    <button class="round" id="secClose" type="button" aria-label="Close"></button>
+  </div>
+  <p class="hint" style="margin:0 0 12px">Protect your library with passwords, inspect everyone who logs into your app or shared links, and revoke leaked links without losing your data.</p>
+
+  <div class="sec-section">
+    <h3 id="secLogHeading">Visitor &amp; Device Login Logs</h3>
+    <p id="secLogSummary" class="hint" style="margin:0 0 10px">Every time somebody logs into a shared link or unlocks this app, their name, time, device, browser, screen, timezone and IP are recorded.</p>
+    <div class="activity-controls" style="margin:10px 0 12px">
+      <input id="secLogSearch" type="search" aria-label="Search login logs" placeholder="Search by visitor, folder, device or IP" autocomplete="off">
+      <select id="secLogFilter" aria-label="Filter login logs">
+        <option value="all">All events</option>
+        <option value="success">Successful logins</option>
+        <option value="failed">Failed / blocked</option>
+        <option value="share">Shared link logins</option>
+        <option value="device">App lock logins</option>
+      </select>
+    </div>
+    <div class="sec-actions" style="margin:0 0 12px">
+      <button class="btn small" id="secLogRefresh" type="button">Sync from repo</button>
+      <button class="btn small" id="secLogCsv" type="button">Export .csv</button>
+      <button class="btn small" id="secLogJson" type="button">Export .json</button>
+      <button class="textbtn" id="secLogClear" type="button">Clear logs</button>
+    </div>
+    <div id="secLogList" class="picklist"></div>
+  </div>
+
+  <div class="sec-section">
+    <h3 id="secLockHeading">App Password Lock (Protect This Device)</h3>
+    <p id="secLockStatus" class="hint" style="margin:0 0 10px"></p>
+    <label class="field" style="margin-top:8px">
+      <span class="lbl">Set or change device lock password</span>
+      <span class="token-entry">
+        <input id="secLockPass" type="password" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="Enter password (min 4 characters)">
+        <button id="secLockReveal" class="btn small" type="button" aria-pressed="false">Show</button>
+      </span>
+    </label>
+    <label class="check" style="margin-top:12px"><input id="secLockRequireName" type="checkbox" checked>Ask for visitor / user name every time someone logs in on this device</label>
+    <p class="hint">Encrypts your saved GitHub token in browser storage using AES-256-GCM and requires logging in every time the app is opened or locked.</p>
+    <div id="secLockMsg" class="formmsg" role="status"></div>
+    <div class="sec-actions">
+      <button class="btn small" id="secLockSave" type="button">Save password lock</button>
+      <button class="btn small" id="secLockNow" type="button" hidden>Lock app now</button>
+      <button class="btn small danger" id="secLockRemove" type="button" hidden>Remove password lock</button>
+    </div>
+  </div>
+
+  <div class="sec-section">
+    <h3 id="secWebhookHeading">Remote Login Capture Webhook</h3>
+    <p class="hint" style="margin:0 0 10px">Read-only share tokens cannot write to your GitHub repo. Add a webhook URL (Discord webhook, Slack webhook, or custom HTTPS endpoint) to receive every visitor's login data in real time.</p>
+    <label class="field" style="margin-top:8px">
+      <span class="lbl">Default webhook URL for login capture</span>
+      <input id="secWebhookUrl" type="url" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="https://discord.com/api/webhooks/…">
+    </label>
+    <div id="secWebhookMsg" class="formmsg" role="status"></div>
+    <div class="sec-actions">
+      <button class="btn small" id="secWebhookSave" type="button">Save webhook</button>
+      <button class="btn small" id="secWebhookTest" type="button">Send test login</button>
+    </div>
+  </div>
+
+  <div class="sec-section">
+    <h3 id="secLinksHeading">Shared Links &amp; Emergency Leak Protection</h3>
+    <p class="hint" style="margin:0 0 10px">How to save your data if a link ever gets leaked:</p>
+    <ol class="steps" style="margin-bottom:12px">
+      <li><b>Password encryption:</b> Encrypted share links lock the GitHub token with AES-256-GCM, so a leaked URL cannot be opened or decoded without the password.</li>
+      <li><b>Revoke link below:</b> Immediately blocks the leaked link from opening inside My Visuals.</li>
+      <li><b>Save a full backup (.zip):</b> Downloads all original images, videos, folders, tags and login logs to your device.</li>
+      <li><b>Revoke token on GitHub:</b> Delete the read-only sharing token in <a href="https://github.com/settings/personal-access-tokens" target="_blank" rel="noopener noreferrer">GitHub Fine-Grained Tokens</a> to cut off API access while keeping all files in your private repo intact.</li>
+    </ol>
+    <div class="sec-actions" style="margin-bottom:14px">
+      <button class="btn small" id="secBackupNow" type="button">Save full backup (.zip)</button>
+      <button class="btn small danger" id="secRevokeAll" type="button">Revoke all shared links</button>
+    </div>
+    <div id="secLinksList" class="picklist"></div>
+  </div>
+</section>
+
+<div id="loginGate" class="login-gate" role="dialog" aria-modal="true" aria-labelledby="lgTitle" hidden>
+  <form id="lgForm" class="login-card" novalidate>
+    <div class="login-head">
+      <div class="login-ico" id="lgIco"></div>
+      <div>
+        <h2 id="lgTitle">Protected Library</h2>
+        <p id="lgSub">Enter your details and password to log in.</p>
+      </div>
+    </div>
+    <label class="field" id="lgVisitorRow" style="margin-top:16px">
+      <span class="lbl" id="lgVisitorLbl">Your name or email</span>
+      <input id="lgVisitor" type="text" maxlength="80" autocomplete="name" placeholder="e.g. Alex Rivera (alex@example.com)">
+    </label>
+    <label class="field" id="lgNoteRow" style="margin-top:14px">
+      <span class="lbl">Note or purpose (optional)</span>
+      <input id="lgNote" type="text" maxlength="100" autocomplete="off" placeholder="e.g. Reviewing folder">
+    </label>
+    <label class="field" id="lgPassRow" style="margin-top:14px">
+      <span class="lbl">Password</span>
+      <span class="token-entry">
+        <input id="lgPass" type="password" autocomplete="current-password" autocapitalize="none" spellcheck="false" placeholder="Enter password">
+        <button id="lgReveal" class="btn small" type="button" aria-pressed="false">Show</button>
+      </span>
+    </label>
+    <div class="login-notice" id="lgNotice">
+      <b>Security notice:</b> Every login attempt is recorded with your name, timestamp, and device/browser information.
+    </div>
+    <div id="lgMsg" class="formmsg" role="status"></div>
+    <div class="actions" style="margin-top:18px">
+      <button class="cta" id="lgSubmit" type="submit" style="width:100%;justify-content:center">Unlock &amp; Log In</button>
+    </div>
+    <div class="actions" id="lgOwnerResetRow" style="margin-top:10px;justify-content:center" hidden>
+      <button class="textbtn" id="lgResetDevice" type="button">Forgot device password? Disconnect &amp; reset token</button>
+    </div>
+  </form>
+</div>
 
 <section id="bulkTagsSheet" class="sheet top" role="dialog" aria-modal="true" aria-labelledby="btTitle" hidden>
   <div class="sheethead"><h2 id="btTitle">Edit tags</h2><button class="round" id="btClose" type="button" aria-label="Close"></button></div>
@@ -802,7 +1009,11 @@ button[disabled]{cursor:default}
     tag:`<svg viewBox="0 0 24 24" ${P}><path d="M20 13l-7 7-10-10V3h7z"/><circle cx="7.5" cy="7.5" r="1"/></svg>`,
     grip:`<svg viewBox="0 0 24 24" ${P}><circle cx="8" cy="5" r="1"/><circle cx="16" cy="5" r="1"/><circle cx="8" cy="12" r="1"/><circle cx="16" cy="12" r="1"/><circle cx="8" cy="19" r="1"/><circle cx="16" cy="19" r="1"/></svg>`,
     activity:`<svg viewBox="0 0 24 24" ${P}><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>`,
-    share:`<svg viewBox="0 0 24 24" ${P}><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 10.5l6.8-4M8.6 13.5l6.8 4"/></svg>`
+    share:`<svg viewBox="0 0 24 24" ${P}><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 10.5l6.8-4M8.6 13.5l6.8 4"/></svg>`,
+    lock:`<svg viewBox="0 0 24 24" ${P}><rect x="5" y="11" width="14" height="10" rx="3"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>`,
+    unlock:`<svg viewBox="0 0 24 24" ${P}><rect x="5" y="11" width="14" height="10" rx="3"/><path d="M8 11V7a4 4 0 0 1 7.4-2"/></svg>`,
+    shield:`<svg viewBox="0 0 24 24" ${P}><path d="M12 3l7 3v6c0 5-3.5 8.2-7 9-3.5-.8-7-4-7-9V6z"/><path d="M9 12l2 2 4-4"/></svg>`,
+    user:`<svg viewBox="0 0 24 24" ${P}><circle cx="12" cy="8" r="4"/><path d="M4 20c1.8-3.8 5-6 8-6s6.2 2.2 8 6"/></svg>`
   };
   const EXT = {"image/png":"png","image/jpeg":"jpg","image/gif":"gif","image/webp":"webp","image/svg+xml":"svg","video/mp4":"mp4","video/webm":"webm","video/quicktime":"mov"};
   const BY_EXT = {png:"image/png",jpg:"image/jpeg",jpeg:"image/jpeg",gif:"image/gif",webp:"image/webp",svg:"image/svg+xml",mp4:"video/mp4",m4v:"video/mp4",webm:"video/webm",mov:"video/quicktime"};
@@ -810,8 +1021,9 @@ button[disabled]{cursor:default}
   const LS = "visualsLibrary.v1";
   const CACHE = "visuals-cache-v1";
   const MAX_IMG = 25 * 1024 * 1024, MAX_VID = 50 * 1024 * 1024;
+  const PBKDF2_ITER = 210000;
 
-  // ---------- config ----------
+  // ---------- config & Web Crypto encryption ----------
   function detect(){
     const h = location.hostname;
     return h.endsWith(".github.io") ? {owner: h.split(".")[0]} : {};
@@ -820,43 +1032,117 @@ button[disabled]{cursor:default}
     let saved = {};
     try { saved = JSON.parse(localStorage.getItem(LS) || "{}"); } catch (e) {}
     const d = detect();
-    return {owner: saved.owner || d.owner || "", repo: saved.repo || "", branch: saved.branch || "main", token: saved.token || ""};
+    return {
+      owner: saved.owner || d.owner || "",
+      repo: saved.repo || "",
+      branch: saved.branch || "main",
+      token: saved.locked ? "" : (saved.token || ""),
+      locked: !!(saved.locked && saved.encryptedToken),
+      encryptedToken: saved.encryptedToken || null,
+      requireVisitorName: saved.requireVisitorName !== false,
+      webhookUrl: saved.webhookUrl || ""
+    };
   }
-  function saveCfg(){ try { localStorage.setItem(LS, JSON.stringify(cfg)); } catch (e) {} }
+  function saveCfg(){
+    try {
+      const toSave = {
+        owner: cfg.owner || "",
+        repo: cfg.repo || "",
+        branch: cfg.branch || "main",
+        token: cfg.locked ? "" : (cfg.token || ""),
+        locked: !!(cfg.locked && cfg.encryptedToken),
+        encryptedToken: cfg.locked ? cfg.encryptedToken : null,
+        requireVisitorName: cfg.requireVisitorName !== false,
+        webhookUrl: cfg.webhookUrl || ""
+      };
+      localStorage.setItem(LS, JSON.stringify(toSave));
+    } catch (e) {}
+  }
   let cfg = loadCfg();
-  let canEdit = !!(cfg.token && cfg.owner && cfg.repo);
-  let shareMode = false, shareFolderId = null;
+  let deviceLocked = !!(cfg.locked && cfg.encryptedToken && !cfg.token);
+  let canEdit = !!(cfg.token && cfg.owner && cfg.repo && !deviceLocked);
+  let shareMode = false, shareFolderId = null, shareLocked = false, shareEnvelope = null;
+  let shareAllowDl = true, shareWebhook = "", shareLinkId = "", shareCreatedAt = 0;
+
   // A share link never touches localStorage: it's #share=<url-safe-base64 JSON> in the address itself.
   function b64url(str){ return btoa(unescape(encodeURIComponent(str))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); }
   function b64urlDecode(str){ str = str.replace(/-/g, "+").replace(/_/g, "/"); while (str.length % 4) str += "="; return decodeURIComponent(escape(atob(str))); }
+  function bytesToB64Url(bytes){
+    let bin = "";
+    for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+    return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+  function b64UrlToBytes(str){
+    let s = String(str || "").replace(/-/g, "+").replace(/_/g, "/");
+    while (s.length % 4) s += "=";
+    const bin = atob(s), out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  }
+  async function deriveAesKey(password, salt, iterations = PBKDF2_ITER){
+    const km = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveKey"]);
+    return crypto.subtle.deriveKey({name:"PBKDF2", salt, iterations, hash:"SHA-256"}, km, {name:"AES-GCM", length:256}, false, ["encrypt", "decrypt"]);
+  }
+  async function encryptPayload(obj, password){
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const key = await deriveAesKey(password, salt, PBKDF2_ITER);
+    const plain = new TextEncoder().encode(JSON.stringify(obj));
+    const cipher = new Uint8Array(await crypto.subtle.encrypt({name:"AES-GCM", iv}, key, plain));
+    return {v:2, alg:"A256GCM", it:PBKDF2_ITER, s:bytesToB64Url(salt), iv:bytesToB64Url(iv), ct:bytesToB64Url(cipher)};
+  }
+  async function decryptPayload(env, password){
+    if (!env || env.v !== 2 || !env.s || !env.iv || !env.ct) throw new Error("Invalid encrypted payload");
+    const salt = b64UrlToBytes(env.s), iv = b64UrlToBytes(env.iv), ct = b64UrlToBytes(env.ct);
+    const key = await deriveAesKey(password, salt, Number(env.it) || PBKDF2_ITER);
+    const plainBuf = await crypto.subtle.decrypt({name:"AES-GCM", iv}, key, ct);
+    return JSON.parse(new TextDecoder().decode(new Uint8Array(plainBuf)));
+  }
+
   function parseShare(){
     const m = /^#share=(.+)$/.exec(location.hash);
     if (!m) return null;
     try {
       const j = JSON.parse(b64urlDecode(m[1]));
-      if (j && j.o && j.r && j.t && j.f) return j;
+      if (j && j.v === 2 && j.ct && j.iv && j.s) return {encrypted:true, envelope:j};
+      if (j && j.o && j.r && j.t && j.f) return {encrypted:false, envelope:j};
     } catch (e) {}
     return null;
   }
-  const sharePayload = parseShare();
-  if (sharePayload){
-    shareMode = true; shareFolderId = sharePayload.f;
-    cfg = {owner:sharePayload.o, repo:sharePayload.r, branch:sharePayload.b || "main", token:sharePayload.t};
-    canEdit = false;
+  const shareParsed = parseShare();
+  if (shareParsed){
+    shareMode = true; deviceLocked = false; canEdit = false;
+    shareEnvelope = shareParsed.envelope;
+    if (shareParsed.encrypted || shareParsed.envelope.rn){
+      shareLocked = true;
+    } else {
+      const sp = shareParsed.envelope;
+      shareFolderId = sp.f;
+      shareAllowDl = sp.dl !== 0;
+      shareWebhook = sp.wh || "";
+      shareLinkId = sp.sid || "";
+      shareCreatedAt = Number(sp.cat) || 0;
+      cfg = {owner:sp.o, repo:sp.r, branch:sp.b || "main", token:sp.t, locked:false, encryptedToken:null, requireVisitorName:false, webhookUrl:sp.wh || ""};
+    }
   }
 
   const state = {
-    items:[], folders:[], folder:null, tag:null, fav:false, vid:false, q:"", loaded:false, error:null,
+    items:[], folders:[], shareLinks:[], shareRevokedBefore:0,
+    folder:null, tag:null, fav:false, vid:false, q:"", loaded:false, error:null,
     openId:null, pending:[], uploading:false, sha:null, sync:"saved", select:false, sel:new Set(), sort:"date-desc",
     folderSort:"name-asc", reorder:false, demo:location.hash === "#demo",
-    storage:{bytes:null, loading:false, error:false, checkedAt:0}, demoActivity:[]
+    storage:{bytes:null, loading:false, error:false, checkedAt:0}, demoActivity:[], demoLogins:[]
   };
   const deleted = {items:new Set(), folders:new Set()};   // remembered so a merge can't bring them back
   const pendingDel = [];                                   // repo files waiting to be removed after a good save
   let previewUrls = [];
   let folderCtx = null;
   const originalCfg = {...cfg};
-  if (state.demo){ cfg = {owner:"sample", repo:"sample-library", branch:"main", token:""}; canEdit = true; }
+  if (state.demo){
+    deviceLocked = false; shareLocked = false;
+    cfg = {owner:"sample", repo:"sample-library", branch:"main", token:"", locked:false, encryptedToken:null, requireVisitorName:true, webhookUrl:""};
+    canEdit = true;
+  }
 
   // ---------- helpers ----------
   function h(tag, props = {}, ...kids){
@@ -1098,13 +1384,24 @@ button[disabled]{cursor:default}
   const clean = (it) => ({id:it.id, file:it.file, name:it.name, tags:[...(it.tags || [])], fav:!!it.fav, folder:it.folder || null,
     createdAt:it.createdAt, size:it.size, type:it.type, sha:it.sha, thumb:it.thumb, thumbSize:it.thumbSize || 0, dur:it.dur, order:it.order});
   const cleanFolder = (f) => ({id:f.id, name:f.name, parent:f.parent || null, createdAt:f.createdAt || 0});
-  function librarySnapshot(){ return {version:3, folders:state.folders.map(cleanFolder), items:state.items.map(clean)}; }
+  const cleanShareLink = (s) => ({id:s.id, folderId:s.folderId, folderName:s.folderName || "", createdAt:Number(s.createdAt) || 0,
+    expiresAt:s.expiresAt ? Number(s.expiresAt) : null, requireName:s.requireName !== false, allowDl:s.allowDl !== false,
+    passwordProtected:!!s.passwordProtected, revoked:!!s.revoked});
+  function librarySnapshot(){
+    return {
+      version:3,
+      folders:state.folders.map(cleanFolder),
+      items:state.items.map(clean),
+      shareLinks:(state.shareLinks || []).map(cleanShareLink),
+      shareRevokedBefore:Number(state.shareRevokedBefore) || 0
+    };
+  }
   function validFile(path){
     return typeof path === "string" && path.length > 0 && !/[\\\x00-\x1f]/.test(path)
       && path.split("/").every((p) => p && p !== "." && p !== "..");
   }
   function norm(data){
-    const d = data && typeof data === "object" ? data : {}, seenF = new Set(), seenI = new Set();
+    const d = data && typeof data === "object" ? data : {}, seenF = new Set(), seenI = new Set(), seenS = new Set();
     const folders = (Array.isArray(d.folders) ? d.folders : [])
       .filter((f) => {
         if (!f || typeof f.id !== "string" || !f.id || typeof f.name !== "string" || !f.name.trim() || seenF.has(f.id)) return false;
@@ -1135,7 +1432,12 @@ button[disabled]{cursor:default}
       ranks.set(key, Math.max(rank + 1, it.order + 1));
     }
     folders.sort(byName);
-    return {folders, items};
+    const shareLinks = (Array.isArray(d.shareLinks) ? d.shareLinks : []).filter((s) => {
+      if (!s || typeof s.id !== "string" || !s.id || seenS.has(s.id)) return false;
+      seenS.add(s.id); return true;
+    }).map(cleanShareLink).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    const shareRevokedBefore = Math.max(0, Number(d.shareRevokedBefore) || 0);
+    return {folders, items, shareLinks, shareRevokedBefore};
   }
 
   async function fetchLibrary(){
@@ -1156,6 +1458,7 @@ button[disabled]{cursor:default}
     const {sha, data} = await fetchLibrary();
     const n = norm(data);
     state.sha = sha; state.items = n.items; state.folders = n.folders;
+    state.shareLinks = n.shareLinks; state.shareRevokedBefore = n.shareRevokedBefore;
   }
   // Another device saved first: keep what it added, keep our own edits.
   function mergeRemote(remote){
@@ -1167,6 +1470,14 @@ button[disabled]{cursor:default}
     sortFolders();
     const ids = new Set(state.folders.map((f) => f.id));
     state.items = state.items.map((i) => i.folder && !ids.has(i.folder) ? Object.assign({}, i, {folder:null}) : i);
+    const linkMap = new Map((state.shareLinks || []).map((s) => [s.id, s]));
+    for (const rs of (remote.shareLinks || [])){
+      const cur = linkMap.get(rs.id);
+      if (!cur) linkMap.set(rs.id, rs);
+      else if (rs.revoked) cur.revoked = true;
+    }
+    state.shareLinks = [...linkMap.values()].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    state.shareRevokedBefore = Math.max(Number(state.shareRevokedBefore) || 0, Number(remote.shareRevokedBefore) || 0);
   }
   async function putLibrary(retry = true){
     const payload = librarySnapshot();
@@ -1361,8 +1672,10 @@ button[disabled]{cursor:default}
     $("#back").hidden = !f || (shareMode && f.id === shareFolderId);
     $("#back").setAttribute("aria-label", parent ? "Back to " + parent.name : "Back to library");
     $("#gear").hidden = shareMode;
+    $("#lockBtn").hidden = shareMode || !canEdit || !cfg.locked;
     $("#editFolder").hidden = !(f && canEdit);
     $("#folderShareBtn").hidden = !(f && canEdit);
+    document.body.classList.toggle("no-dl", shareMode && !shareAllowDl);
     $("#title").textContent = f ? f.name : "My Visuals";
     document.title = (f ? f.name + " – " : "") + "My Visuals";
     let text;
@@ -1524,7 +1837,7 @@ button[disabled]{cursor:default}
     $("#selBar").hidden = !state.select;
     const none = state.sel.size === 0;
     $("#bTags").disabled = none; $("#bMove").disabled = none; $("#bDel").disabled = none;
-    const hasFiles = shareMode && state.folder && subtreeItems(state.folder).length > 0;
+    const hasFiles = shareMode && shareAllowDl && state.folder && subtreeItems(state.folder).length > 0;
     $("#shareDock").hidden = !hasFiles;
   }
   function render(){
@@ -1573,7 +1886,7 @@ button[disabled]{cursor:default}
   function closeTop(){
     $("#backdrop2").hidden = true;
     cancelShareCheck(true);
-    for (const s of ["#folderSheet", "#moveSheet", "#activitySheet", "#bulkTagsSheet"]) $(s).hidden = true;
+    for (const s of ["#folderSheet", "#moveSheet", "#activitySheet", "#bulkTagsSheet", "#securitySheet"]) $(s).hidden = true;
     resetFolderDelete();
     if ($("#backdrop").hidden && !viewer.open) document.body.classList.remove("lock");
     const c = folderCtx; folderCtx = null;
@@ -1629,10 +1942,6 @@ button[disabled]{cursor:default}
   }
 
   const shareTokenDraft = new Map(); // explicit reuse only, never persisted; keyed by repo/branch
-  function buildShareLink(folderId, token, base){
-    const payload = {o:cfg.owner, r:cfg.repo, b:cfg.branch, t:token, f:folderId};
-    return publicAppAddress(base) + "#share=" + b64url(JSON.stringify(payload));
-  }
 
   // ---------- complete library and recursive folder ZIP exports ----------
   let zipBusy = false, zipMessage = "";
@@ -1685,6 +1994,7 @@ button[disabled]{cursor:default}
   }
   async function runZip(full, folderId){
     if (zipBusy) return;
+    if (shareMode && !shareAllowDl){ toast("Downloads are disabled for this shared link."); return; }
     if (state.uploading){ toast("Finish uploading before making a backup."); return; }
     if ((!canEdit && !shareMode) || !state.loaded || state.error) return;
     if (typeof JSZip === "undefined"){ toast("The bundled ZIP tool is unavailable."); return; }
@@ -1714,10 +2024,11 @@ button[disabled]{cursor:default}
         }
         zip.file("library.json", JSON.stringify(snapshot, null, 2), {compression:"DEFLATE"});
         zip.file("activity.json", JSON.stringify(loadActivity(), null, 2), {compression:"DEFLATE"});
+        zip.file("login-logs.json", JSON.stringify(loadLoginLogs(), null, 2), {compression:"DEFLATE"});
         zip.file("backup.json", JSON.stringify({format:"visuals-library-backup", formatVersion:1, createdAt,
           source:{owner:cfg.owner, repository:cfg.repo, branch:cfg.branch},
-          contents:{items:list.length, folders:folders.length, originals:new Set(list.map((i) => i.file)).size, previews:new Set(list.filter((i) => i.thumb).map((i) => i.thumb)).size},
-          note:"Library files and metadata only. No credentials, Git history or unrelated repository files."}, null, 2), {compression:"DEFLATE"});
+          contents:{items:list.length, folders:folders.length, originals:new Set(list.map((i) => i.file)).size, previews:new Set(list.filter((i) => i.thumb).map((i) => i.thumb)).size, loginLogs:loadLoginLogs().length},
+          note:"Library files, metadata and login logs only. No credentials, Git history or unrelated repository files."}, null, 2), {compression:"DEFLATE"});
         zip.file("README.txt", "MY VISUALS — COMPLETE LIBRARY BACKUP\nCreated: " + createdAt + "\n\n"
           + "images/ holds original library files. thumbs/ holds all referenced previews.\n"
           + "library.json preserves names, tags, favorites, folder hierarchy, dates and custom order.\n"
@@ -1858,7 +2169,7 @@ button[disabled]{cursor:default}
   function renderActivity(){
     const all = loadActivity(), q = $("#aSearch").value.trim().toLowerCase(), filter = $("#aFilter").value;
     const log = all.filter((e) => (filter === "all" || (e.type || "edit") === filter) && q.split(/\s+/).every((t) => e.msg.toLowerCase().includes(t)));
-    const box = $("#activityList"), kids = [], icons = {upload:"plus", edit:"pencil", folder:"folder", delete:"trash", backup:"download", share:"share"};
+    const box = $("#activityList"), kids = [], icons = {upload:"plus", edit:"pencil", folder:"folder", delete:"trash", backup:"download", share:"share", security:"shield"};
     let day = "";
     for (const e of log){
       const next = activityDay(e.t); if (next !== day){ day = next; kids.push(h("h3", {class:"activity-day", text:day})); }
@@ -1971,6 +2282,7 @@ button[disabled]{cursor:default}
     $("#dFav").hidden = !canEdit;
     $("#dDel").hidden = !canEdit;
     $("#dFolderRow").hidden = !canEdit;
+    $("#dDl").hidden = shareMode && !shareAllowDl;
     $("#dDl").replaceChildren(icon("download"), "Download");
     resetDelete();
     refreshDetail();
@@ -2002,6 +2314,7 @@ button[disabled]{cursor:default}
     patch(it.id, {tags: [...new Set([...(it.tags || []), ...add])].slice(0, 20)});
   }
   async function download(id){
+    if (shareMode && !shareAllowDl){ toast("Downloads are disabled for this shared link."); return; }
     const it = find(id); if (!it) return;
     try {
       if (isVideo(it) && !peek(it, false)) toast("Getting the video…");
@@ -2198,6 +2511,7 @@ button[disabled]{cursor:default}
     $("#vCount").textContent = (i + 1) + " of " + n;
     const fav = $("#vFav");
     fav.hidden = !canEdit; $("#vInfo").hidden = !canEdit;
+    $("#vDl").hidden = shareMode && !shareAllowDl;
     fav.setAttribute("aria-pressed", String(!!it.fav));
     fav.setAttribute("aria-label", it.fav ? "Remove from favorites" : "Add to favorites");
     $("#vPrev").disabled = i <= 0; $("#vNext").disabled = i >= n - 1;
@@ -2371,8 +2685,8 @@ button[disabled]{cursor:default}
     $("#sStorageTarget").value = storageTarget() / 1048576;
     $("#storageMsg").textContent = "";
     $("#sOwner").value = cfg.owner; $("#sRepo").value = cfg.repo || "visuals-data"; $("#sToken").value = "";
-    $("#sToken").placeholder = cfg.token ? "Connected. Paste a new token to replace it" : "github_pat_…";
-    $("#sOut").hidden = !cfg.token;
+    $("#sToken").placeholder = (cfg.token || cfg.locked) ? "Connected. Paste a new token to replace it" : "github_pat_…";
+    $("#sOut").hidden = !cfg.token && !cfg.locked;
     const st = $("#sStatus");
     st.hidden = !canEdit; st.textContent = state.demo ? "Sample library · no GitHub connection" : canEdit ? "Connected to " + cfg.owner + "/" + cfg.repo : "";
     $("#sMsg").textContent = ""; $("#sMsg").className = "formmsg";
@@ -2399,6 +2713,7 @@ button[disabled]{cursor:default}
         const b = await gh("GET", "branches/" + enc(cfg.branch));
         if (b.status === 404){ cfg = prev; sMsg("That repo has no files yet. On GitHub, add a README to it once, then try again.", true); }
         else {
+          cfg.locked = false; cfg.encryptedToken = null; deviceLocked = false;
           resetRepoSession(); saveCfg(); canEdit = true;
           closeSheets(); toast(r.json.private === false ? "Connected, but this repo is public. Make it private in the repo settings." : "Connected");
           await start();
@@ -2409,11 +2724,13 @@ button[disabled]{cursor:default}
   }
   function disconnect(){
     clearTimeout(saveTimer); cancelDrag(); state.reorder = false;
-    cfg.token = ""; saveCfg(); canEdit = false; resetRepoSession();
+    cfg.token = ""; cfg.locked = false; cfg.encryptedToken = null; deviceLocked = false;
+    saveCfg(); canEdit = false; resetRepoSession();
     urlCache.forEach((u) => URL.revokeObjectURL(u)); urlCache.clear();
     videoUrls.forEach((u) => URL.revokeObjectURL(u)); videoUrls.clear();
     try { if (window.caches) caches.delete(CACHE); } catch (e) {}
-    state.items = []; state.folders = []; state.folder = null; exitSelect();
+    state.items = []; state.folders = []; state.shareLinks = []; state.shareRevokedBefore = 0; state.folder = null; exitSelect();
+    $("#loginGate").hidden = true;
     closeSheets(); toast("Disconnected. Your files remain in the repository.");
     start();
   }
@@ -2470,7 +2787,7 @@ button[disabled]{cursor:default}
     for (const it of state.items) for (const key of ["_url", "_turl"]) if (it[key]) URL.revokeObjectURL(it[key]);
     urlCache.forEach((u) => URL.revokeObjectURL(u)); urlCache.clear();
     videoUrls.forEach((u) => URL.revokeObjectURL(u)); videoUrls.clear();
-    state.items = []; state.folders = []; state.folder = null; state.sha = null;
+    state.items = []; state.folders = []; state.shareLinks = []; state.shareRevokedBefore = 0; state.folder = null; state.sha = null;
     state.tag = null; state.fav = false; state.vid = false; state.q = ""; $("#q").value = "";
   }
 
@@ -2656,10 +2973,19 @@ button[disabled]{cursor:default}
       return {id:"sample"+i,file,thumb,name,tags,fav,folder,createdAt:now-i*day,size:blob.size,thumbSize:blob.size,type:"image/svg+xml",order,sha:"sample-sha-"+i,_url:URL.createObjectURL(blob)};
     });
     sortFolders(); state.sha = "sample-library-sha";
+    state.shareLinks = [
+      {id:"slink-1", folderId:"ftravel", folderName:"Travel", createdAt:now-2*day, expiresAt:now+7*day, hasPassword:true, requireName:true, allowDl:false, revoked:false}
+    ];
+    state.shareRevokedBefore = 0;
     state.demoActivity = [
+      {id:"d0",t:now-60000,type:"security",msg:"Sample: created password-protected link for Travel"},
       {id:"d1",t:now-120000,type:"edit",msg:"Sample: organized coastal images in Travel / Coast"},
       {id:"d2",t:now-3600000,type:"upload",msg:"Sample: added 10 illustrated images"},
       {id:"d3",t:now-day,type:"folder",msg:"Sample: created Travel and its subfolders"}
+    ];
+    state.demoLogins = [
+      {id:"log-1", t:now-180000, iso:new Date(now-180000).toISOString(), status:"success", mode:"share_link", user:"Alex Rivera (alex@studio.example)", folderId:"ftravel", folder:"Travel", linkId:"slink-1", ip:"203.0.113.42", location:"Mumbai, Maharashtra, IN", isp:"Cloudflare Net", ua:"Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/605.1.15", lang:"en-US", tz:"Asia/Kolkata", screen:"1728x1117 @2x", platform:"macOS", ref:"direct"},
+      {id:"log-2", t:now-5400000, iso:new Date(now-5400000).toISOString(), status:"failed_password", mode:"share_link", user:"Unknown visitor", folderId:"ftravel", folder:"Travel", linkId:"slink-1", ip:"198.51.100.19", location:"Frankfurt, HE, DE", isp:"Example Transit", ua:"Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X)", lang:"de-DE", tz:"Europe/Berlin", screen:"393x852 @3x", platform:"iOS", ref:"direct"}
     ];
   }
   async function demoGh(method,path,body){
@@ -2670,8 +2996,13 @@ button[disabled]{cursor:default}
       return response({size:Math.ceil(bytes/1024),private:true,default_branch:"main",permissions:{push:true}});
     }
     if (method === "GET" && cleanPath === "contents/library.json") return response({sha:state.sha,content:textB64(JSON.stringify(librarySnapshot()))});
+    if (method === "GET" && cleanPath === "contents/login-logs.json") return response({sha:"sample-logins-sha",content:textB64(JSON.stringify(state.demoLogins || []))});
     if (method === "GET" && cleanPath.startsWith("branches/")) return response({name:"main"});
     if (method === "PUT"){
+      if (filePath === "login-logs.json"){
+        try { state.demoLogins = JSON.parse(b64Text(body.content)); } catch (e) {}
+        return response({content:{sha:"sample-logins-"+uid()}});
+      }
       const bytes = Uint8Array.from(atob(body.content),(c)=>c.charCodeAt(0));
       demoFiles.set(filePath,new Blob([bytes],{type:mimeOf(filePath)}));
       return response({content:{sha:"sample-"+uid()}});
@@ -2683,28 +3014,161 @@ button[disabled]{cursor:default}
   function activateDemo(){
     if (shareMode || canEdit) return;
     demoReturnCfg = {...cfg}; resetRepoSession(); state.demo = true;
-    cfg = {owner:"sample",repo:"sample-library",branch:"main",token:""}; canEdit = true;
+    cfg = {owner:"sample",repo:"sample-library",branch:"main",token:""}; canEdit = true; deviceLocked = false;
+    $("#loginGate").hidden = true;
     try { history.replaceState({demoFolder:null},"",location.pathname+location.search+"#demo"); } catch (e) {}
     start();
   }
   function exitDemo(){
     if (!state.demo || state.uploading || zipBusy) return;
-    closeSheets(); resetRepoSession(); state.demo = false; state.demoActivity = []; demoFiles.clear();
-    cfg = {...demoReturnCfg}; canEdit = !!(cfg.owner && cfg.repo && cfg.token);
+    closeSheets(); resetRepoSession(); state.demo = false; state.demoActivity = []; state.demoLogins = []; demoFiles.clear();
+    cfg = {...demoReturnCfg}; deviceLocked = !!cfg.locked; canEdit = !!(cfg.owner && cfg.repo && cfg.token) && !deviceLocked;
     try { history.replaceState(null,"",location.pathname+location.search); } catch (e) {}
     start();
   }
 
+  // ---------- login telemetry, audit log & security center ----------
+  const LOGIN_LOG_KEY = "visuals-login-logs-v1";
+  const fmtLogTime = (t) => new Date(Number(t) || Date.now()).toLocaleString();
+  const stampNow = () => new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+  function loadLoginLogs(){
+    if (state.demo) return state.demoLogins || [];
+    try {
+      const a = JSON.parse(localStorage.getItem(LOGIN_LOG_KEY) || "[]");
+      return Array.isArray(a) ? a : [];
+    } catch (e){ return []; }
+  }
+  function saveLoginLogs(list){
+    const trimmed = (Array.isArray(list) ? list : []).slice(0, 250);
+    if (state.demo){ state.demoLogins = trimmed; return; }
+    try { localStorage.setItem(LOGIN_LOG_KEY, JSON.stringify(trimmed)); } catch (e) {}
+  }
+  async function collectVisitorTelemetry(){
+    const nav = navigator || {};
+    const info = {
+      ip: "unavailable",
+      location: "unavailable",
+      isp: "",
+      ua: String(nav.userAgent || "").slice(0, 220),
+      lang: String(nav.language || (nav.languages && nav.languages[0]) || "").slice(0, 32),
+      tz: "",
+      screen: (window.screen ? window.screen.width + "x" + window.screen.height : "") + (window.devicePixelRatio ? " @" + window.devicePixelRatio + "x" : ""),
+      platform: String(nav.userAgentData?.platform || nav.platform || "").slice(0, 48),
+      ref: document.referrer ? String(document.referrer).slice(0, 140) : "direct"
+    };
+    try { info.tz = Intl.DateTimeFormat().resolvedOptions().timeZone || ""; } catch (e) {}
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 3200);
+    try {
+      const r = await fetch("https://ipapi.co/json/", {signal:ctrl.signal, cache:"no-store"});
+      if (r.ok){
+        const j = await r.json();
+        if (j && j.ip) info.ip = String(j.ip).slice(0, 64);
+        const loc = [j.city, j.region, j.country_name || j.country].filter(Boolean).join(", ");
+        if (loc) info.location = loc.slice(0, 120);
+        if (j.org) info.isp = String(j.org).slice(0, 100);
+      }
+    } catch (e){
+      try {
+        const r2 = await fetch("https://api.ipify.org?format=json", {signal:ctrl.signal, cache:"no-store"});
+        if (r2.ok){
+          const j2 = await r2.json();
+          if (j2 && j2.ip) info.ip = String(j2.ip).slice(0, 64);
+        }
+      } catch (e2) {}
+    } finally { clearTimeout(timer); }
+    return info;
+  }
+  async function sendWebhookLog(url, entry){
+    if (!url || !/^https:\/\//i.test(url)) return false;
+    try {
+      const summary = `[My Visuals Login] ${entry.status.toUpperCase()} · User: ${entry.user || "Anonymous"} · Mode: ${entry.mode} · Folder: ${entry.folder || entry.folderId || "App"} · IP: ${entry.ip} (${entry.location}) · Device: ${entry.platform} ${entry.screen} · Time: ${entry.iso}`;
+      const body = JSON.stringify({
+        content: summary,
+        text: summary,
+        event: "visuals_login",
+        entry
+      });
+      await fetch(url, {method:"POST", headers:{"Content-Type":"application/json"}, body, mode:"cors"}).catch(() =>
+        fetch(url, {method:"POST", headers:{"Content-Type":"text/plain;charset=utf-8"}, body, mode:"no-cors"})
+      );
+      return true;
+    } catch (e){ return false; }
+  }
+  async function syncLoginEntryToRepo(entry){
+    if (!cfg.owner || !cfg.repo || (!cfg.token && !state.demo)) return false;
+    try {
+      const r = await gh("GET", "contents/login-logs.json?ref=" + enc(cfg.branch));
+      let list = [], sha = null;
+      if (r.status === 200 && r.json){
+        sha = r.json.sha;
+        const raw = r.json.content ? b64Text(r.json.content) : "";
+        const parsed = raw ? JSON.parse(raw) : [];
+        if (Array.isArray(parsed)) list = parsed;
+      } else if (r.status !== 404) return false;
+      const merged = [entry, ...list.filter((x) => x && x.id !== entry.id)].slice(0, 250);
+      const body = {message:"record login event", content:textB64(JSON.stringify(merged, null, 2)), branch:cfg.branch};
+      if (sha) body.sha = sha;
+      const put = await gh("PUT", "contents/login-logs.json", body);
+      return put.ok;
+    } catch (e){ return false; }
+  }
+  async function fetchRepoLoginLogs(){
+    if (!canEdit || !cfg.owner || !cfg.repo) return false;
+    try {
+      const r = await gh("GET", "contents/login-logs.json?ref=" + enc(cfg.branch));
+      if (r.status === 200 && r.json){
+        const raw = r.json.content ? b64Text(r.json.content) : "";
+        const remote = raw ? JSON.parse(raw) : [];
+        if (Array.isArray(remote)){
+          const local = loadLoginLogs();
+          const map = new Map();
+          for (const item of [...remote, ...local]){
+            if (item && item.id && !map.has(item.id)) map.set(item.id, item);
+          }
+          const combined = [...map.values()].sort((a,b) => (b.t || 0) - (a.t || 0)).slice(0, 250);
+          saveLoginLogs(combined);
+          return true;
+        }
+      }
+    } catch (e) {}
+    return false;
+  }
+  async function recordLoginEvent({status = "success", mode = "share_link", user = "", note = "", folderId = "", folder = "", linkId = "", webhook = ""} = {}){
+    const now = Date.now();
+    const tele = await collectVisitorTelemetry();
+    const entry = {
+      id: "lg-" + uid(),
+      t: now,
+      iso: new Date(now).toISOString(),
+      status: String(status).slice(0, 40),
+      mode: String(mode).slice(0, 40),
+      user: String(user || (mode === "device_lock" ? "Owner" : "Visitor")).slice(0, 100),
+      note: String(note || "").slice(0, 120),
+      folderId: String(folderId || shareFolderId || "").slice(0, 48),
+      folder: String(folder || (folderId && findFolder(folderId) ? folderPath(folderId) : "")).slice(0, 120),
+      linkId: String(linkId || shareLinkId || "").slice(0, 48),
+      ...tele
+    };
+    const list = loadLoginLogs();
+    list.unshift(entry);
+    saveLoginLogs(list);
+    const wh = webhook || shareWebhook || cfg.webhook || "";
+    if (wh) sendWebhookLog(wh, entry);
+    if (canEdit) syncLoginEntryToRepo(entry);
+    if (!$("#securitySheet").hidden) renderSecuritySheet();
+    return entry;
+  }
+
   // ---------- sender-entered read-only token sharing ----------
-  // Only the sender's explicit generated link includes the token. Drafts are tab-local;
-  // neither sharing drafts nor recipient tokens are written to localStorage/library.json.
+  // Shared links can be encrypted with PBKDF2-SHA256 + AES-256-GCM so a leaked link never exposes the token in plaintext.
   let shareCheckController = null, shareCheckSerial = 0, shareBusy = false;
   function shareMsg(text = "", bad = false){
     const el = $("#fShareMsg"); el.textContent = text; el.className = "formmsg" + (bad ? " bad" : "");
   }
   function clearShareOutput(){
     $("#fShareOut").textContent = ""; $("#fShareOut").hidden = true;
-    $("#fCopyBar").hidden = true;
+    $("#fCopyBar").hidden = true; $("#fCopyPassGo").hidden = true;
   }
   function cancelShareCheck(clearFields = false){
     shareCheckSerial++;
@@ -2713,6 +3177,8 @@ button[disabled]{cursor:default}
     if (clearFields){
       if (!$("#fShareRemember").checked) shareTokenDraft.delete(repoKey());
       $("#fShareToken").value = ""; $("#fShareToken").type = "password";
+      $("#fSharePass").value = ""; $("#fSharePass").type = "password";
+      $("#fSharePassReveal").textContent = "Show"; $("#fSharePassReveal").setAttribute("aria-pressed", "false");
       $("#fShareBase").value = ""; $("#fShareConfirm").checked = false;
       $("#fShareReveal").textContent = "Show"; $("#fShareReveal").setAttribute("aria-pressed", "false");
       clearShareOutput(); shareMsg();
@@ -2723,7 +3189,8 @@ button[disabled]{cursor:default}
     const raw = String(value || "").trim();
     if (!raw) throw new Error("Enter the HTTPS address where your My Visuals app is published.");
     let url; try { url = new URL(raw); } catch (e){ throw new Error("Enter a valid public app address, for example https://yourname.github.io/my-visuals/."); }
-    if (url.protocol !== "https:") throw new Error("Use an HTTPS address for your published app, not a local HTML file.");
+    if (url.protocol !== "https:" && url.hostname !== "localhost" && !url.hostname.endsWith(".e2b.app"))
+      throw new Error("Use an HTTPS address for your published app, not a local HTML file.");
     if (url.username || url.password) throw new Error("Use an app address without a username or password in the URL.");
     const host = url.hostname.toLowerCase();
     if (host === "localhost" || host.endsWith(".localhost") || /^127\./.test(host) || host === "[::1]" || host === "0.0.0.0")
@@ -2741,16 +3208,36 @@ button[disabled]{cursor:default}
   }
   function updateSharingState(){
     const token = $("#fShareToken").value.trim();
+    const usePass = $("#fShareUsePass").checked;
+    const pass = $("#fSharePass").value;
+    $("#fSharePassFields").hidden = !usePass;
     let validAddress = false; try { publicAppAddress($("#fShareBase").value); validAddress = true; } catch (e) {}
     const unavailable = state.demo || !canEdit || !state.loaded || !!state.error;
     const locked = unavailable || shareBusy;
-    for (const id of ["#fShareToken", "#fShareBase", "#fShareConfirm", "#fShareRemember", "#fShareReveal"]) $(id).disabled = locked;
-    $("#fShareGo").disabled = locked || state.uploading || zipBusy || !token || !!shareTokenError(token) || !validAddress || !$("#fShareConfirm").checked;
-    $("#fShareGo").textContent = shareBusy ? "Checking access…" : "Check token & create link";
+    for (const id of ["#fShareToken", "#fShareUsePass", "#fSharePass", "#fSharePassReveal", "#fSharePassGen", "#fShareExpiry", "#fShareRequireName", "#fShareAllowDl", "#fShareWebhook", "#fShareBase", "#fShareConfirm", "#fShareRemember", "#fShareReveal"]){
+      $(id).disabled = locked;
+    }
+    const passOk = !usePass || pass.length >= 4;
+    $("#fShareGo").disabled = locked || state.uploading || zipBusy || !token || !!shareTokenError(token) || !validAddress || !$("#fShareConfirm").checked || !passOk;
+    $("#fShareGo").textContent = shareBusy ? "Encrypting & checking…" : "Check token & create link";
     $("#fCopyGo").disabled = !$("#fShareOut").textContent || shareBusy;
+    $("#fCopyPassGo").disabled = !$("#fShareOut").textContent || shareBusy;
     $("#fSendGo").hidden = typeof navigator.share !== "function" || unavailable;
     $("#fSendGo").disabled = !$("#fShareOut").textContent || shareBusy;
     $("#folderShareBtn").disabled = !canEdit || !state.loaded || !!state.error || state.uploading || zipBusy;
+  }
+  function renderFolderActiveLinks(folderId){
+    const links = (state.shareLinks || []).filter((s) => s.folderId === folderId && !s.revoked && (!state.shareRevokedBefore || s.createdAt > state.shareRevokedBefore));
+    $("#fShareActiveBox").hidden = links.length === 0;
+    const listEl = $("#fShareActiveList");
+    if (!links.length){ listEl.replaceChildren(); return; }
+    listEl.replaceChildren(...links.map((s) => h("div", {class:"sec-card"},
+      h("div", {class:"sec-card-head"},
+        h("span", {class:"sec-card-title", text:"Link " + s.id + (s.hasPassword ? " (AES-256 Password)" : " (No password)")}),
+        h("button", {class:"btn small danger", type:"button", text:"Revoke link", onclick:() => { revokeShareLink(s.id); renderFolderActiveLinks(folderId); }})
+      ),
+      h("div", {class:"sec-card-meta", text:"Created " + fmtLogTime(s.createdAt) + (s.expiresAt ? " · Expires " + new Date(s.expiresAt).toLocaleDateString() : " · Never expires")})
+    )));
   }
   function prepareSharing(ctx){
     cancelShareCheck(true);
@@ -2762,8 +3249,14 @@ button[disabled]{cursor:default}
     $("#fShareToken").placeholder = state.demo ? "Connect visuals-data to enter a sharing token" : "Paste a separate github_pat_… token";
     $("#fShareToken").value = !state.demo && draft ? draft.token : "";
     $("#fShareBase").value = draft?.base || defaultPublicAppAddress();
+    $("#fShareWebhook").value = cfg.webhook || "";
+    $("#fShareUsePass").checked = true;
+    $("#fShareRequireName").checked = true;
+    $("#fShareAllowDl").checked = true;
+    $("#fShareExpiry").value = "604800000";
     $("#fShareConfirm").checked = !!(!state.demo && draft?.confirmed);
     $("#fShareRemember").checked = true;
+    renderFolderActiveLinks(ctx.id);
     updateSharingState();
   }
   function openFolderShare(id = state.folder){
@@ -2794,6 +3287,38 @@ button[disabled]{cursor:default}
     if (scopes.includes("repo") || scopes.includes("public_repo")) throw new Error("This token advertises write-capable classic repo scopes. Use a separate fine-grained read-only token instead.");
     return raw ? r.text() : r.json();
   }
+  async function buildShareLink(folderId, token, base, opts = {}){
+    const url = new URL(base);
+    const linkId = opts.id || ("sl-" + uid());
+    const inner = {
+      o: cfg.owner,
+      r: cfg.repo,
+      b: cfg.branch,
+      t: token,
+      f: folderId,
+      id: linkId,
+      exp: opts.exp || 0,
+      rn: opts.rn !== false,
+      dl: opts.dl !== false,
+      wh: opts.wh || ""
+    };
+    let payloadObj = inner;
+    if (opts.pass){
+      const encEnvelope = await encryptPayload(inner, opts.pass);
+      payloadObj = {
+        enc: true,
+        id: linkId,
+        f: folderId,
+        exp: opts.exp || 0,
+        rn: opts.rn !== false,
+        dl: opts.dl !== false,
+        ...encEnvelope
+      };
+    }
+    const payload = textB64(JSON.stringify(payloadObj)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+    url.hash = "share=" + payload;
+    return {url: url.toString(), linkId};
+  }
   async function createFolderShareLink(){
     const ctx = folderCtx;
     if (!ctx || ctx.mode !== "edit" || !canEdit || shareBusy) return;
@@ -2803,14 +3328,22 @@ button[disabled]{cursor:default}
     if (!token){ shareMsg("Paste a separate read-only token for your data repository.", true); return; }
     const tokenError = shareTokenError(token); if (tokenError){ shareMsg(tokenError, true); return; }
     if (!$("#fShareConfirm").checked){ shareMsg("Confirm that you set Contents to Read-only on GitHub.", true); return; }
+    const usePass = $("#fShareUsePass").checked;
+    const pass = usePass ? $("#fSharePass").value : "";
+    if (usePass && pass.length < 4){ shareMsg("Enter a link password of at least 4 characters, or uncheck password encryption.", true); return; }
     let base; try { base = publicAppAddress($("#fShareBase").value); } catch (e){ shareMsg(e.message, true); return; }
+    const expMs = Number($("#fShareExpiry").value) || 0;
+    const exp = expMs > 0 ? Date.now() + expMs : 0;
+    const rn = $("#fShareRequireName").checked;
+    const dl = $("#fShareAllowDl").checked;
+    const wh = $("#fShareWebhook").value.trim();
+    if (wh && !/^https:\/\//i.test(wh)){ shareMsg("Webhook URL must start with https://", true); return; }
+    if (wh && wh !== cfg.webhook){ cfg.webhook = wh; saveCfg(); }
     const repo = {...cfg}, session = repoSession, controller = new AbortController(), serial = ++shareCheckSerial;
     shareCheckController = controller; shareBusy = true; clearShareOutput();
     shareMsg("Checking whether this token can read your data repository…"); updateSharingState();
     const stillCurrent = () => serial === shareCheckSerial && session === repoSession && folderCtx === ctx && !controller.signal.aborted;
     try {
-      // Commit the sender's existing edits with the editing connection first.
-      // All access checks made with the supplied sharing token are GET requests only.
       if (state.sync !== "saved" || savingPromise){
         shareMsg("Saving folder changes before creating the link…");
         if (!(await flushSave())) throw new Error("Your folder changes could not be saved. Retry sync before sharing.");
@@ -2825,12 +3358,29 @@ button[disabled]{cursor:default}
       if (!Array.isArray(library.folders) || !library.folders.some((f) => f && f.id === ctx.id))
         throw new Error("The saved data repository does not contain this folder. Sync your library and try again.");
       if (!stillCurrent() || !findFolder(ctx.id)) return;
-      const url = buildShareLink(ctx.id, token, base);
+      const {url, linkId} = await buildShareLink(ctx.id, token, base, {pass, exp, rn, dl, wh});
+      const linkMeta = cleanShareLink({
+        id: linkId,
+        folderId: ctx.id,
+        folderName: folderPath(ctx.id),
+        createdAt: Date.now(),
+        expiresAt: exp,
+        hasPassword: !!pass,
+        requireName: rn,
+        allowDl: dl,
+        revoked: false
+      });
+      if (linkMeta){
+        state.shareLinks = [linkMeta, ...(state.shareLinks || []).filter((s) => s.id !== linkId)].slice(0, 100);
+        scheduleSave();
+        renderFolderActiveLinks(ctx.id);
+      }
       $("#fShareOut").textContent = url; $("#fShareOut").hidden = false; $("#fCopyBar").hidden = false;
+      $("#fCopyPassGo").hidden = !pass;
       if ($("#fShareRemember").checked) shareTokenDraft.set(repoKey(), {token, base, confirmed:true});
       else shareTokenDraft.delete(repoKey());
-      shareMsg("Link ready. Copy it and send it to the recipient. Read access was checked; the read-only permission setting is your confirmation, not an API guarantee.");
-      logActivity("Created a view-only link for folder “" + folderPath(ctx.id) + "”", "share");
+      shareMsg((pass ? "AES-256 password-encrypted link ready. Even if this link leaks, the token cannot be decoded without your password." : "Link ready (no password set — consider adding a password so leaked links cannot expose your token).") + " You can revoke this link anytime below or in Security & Logins.");
+      logActivity("Created " + (pass ? "password-encrypted " : "") + "share link for folder “" + folderPath(ctx.id) + "”", "security");
     } catch (e){
       if (!stillCurrent() || e?.name === "AbortError") return;
       clearShareOutput();
@@ -2841,27 +3391,51 @@ button[disabled]{cursor:default}
       if (serial === shareCheckSerial){ shareBusy = false; shareCheckController = null; updateSharingState(); }
     }
   }
-  async function copyFolderShareLink(){
-    const text = $("#fShareOut").textContent; if (!text || shareBusy) return;
+  async function copyFolderShareLink(withPassword = false){
+    const url = $("#fShareOut").textContent; if (!url || shareBusy) return;
+    const pass = $("#fShareUsePass").checked ? $("#fSharePass").value : "";
+    const text = (withPassword && pass) ? ("Shared Folder Link: " + url + "\nPassword: " + pass) : url;
     try {
       if (!navigator.clipboard?.writeText) throw new Error("Clipboard unavailable");
-      await navigator.clipboard.writeText(text); toast("Share link copied. Send it to the recipient.");
+      await navigator.clipboard.writeText(text);
+      toast(withPassword && pass ? "Copied link and password." : "Share link copied. Send the password separately.");
     } catch (e){
       const range = document.createRange(); range.selectNodeContents($("#fShareOut"));
       const selection = window.getSelection(); selection.removeAllRanges(); selection.addRange(range);
       let copied = false; try { copied = !!document.execCommand("copy"); } catch (err) {}
-      if (copied) toast("Share link copied. Send it to the recipient.");
+      if (copied) toast("Share link copied.");
       else { $("#fShareOut").focus(); toast("Link selected. Use your device's Copy command, then send it."); }
     }
   }
   async function sendFolderShareLink(){
     const url = $("#fShareOut").textContent; if (!url || shareBusy || !navigator.share) return;
-    try { await navigator.share({title:(findFolder(folderCtx?.id)?.name || "Shared folder") + " – My Visuals", text:"View and download this folder in My Visuals.", url}); }
+    try { await navigator.share({title:(findFolder(folderCtx?.id)?.name || "Shared folder") + " – My Visuals", text:"View this protected folder in My Visuals.", url}); }
     catch (e){ if (e?.name !== "AbortError") toast("Use Copy link to send this folder instead."); }
   }
   $("#folderShareBtn").replaceChildren(icon("share"), "Share folder");
   $("#folderShareBtn").addEventListener("click", () => openFolderShare());
   $("#fShareToken").addEventListener("input", () => shareInputChanged(true));
+  $("#fShareUsePass").addEventListener("change", () => shareInputChanged());
+  $("#fSharePass").addEventListener("input", () => shareInputChanged());
+  $("#fSharePassReveal").addEventListener("click", () => {
+    const show = $("#fSharePass").type === "password";
+    $("#fSharePass").type = show ? "text" : "password";
+    $("#fSharePassReveal").textContent = show ? "Hide" : "Show";
+    $("#fSharePassReveal").setAttribute("aria-pressed", String(show));
+  });
+  $("#fSharePassGen").addEventListener("click", () => {
+    const chars = "abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789!@#$%";
+    const arr = crypto.getRandomValues(new Uint8Array(12));
+    $("#fSharePass").value = Array.from(arr, (b) => chars[b % chars.length]).join("");
+    $("#fSharePass").type = "text";
+    $("#fSharePassReveal").textContent = "Hide";
+    $("#fSharePassReveal").setAttribute("aria-pressed", "true");
+    shareInputChanged();
+  });
+  $("#fShareExpiry").addEventListener("change", () => shareInputChanged());
+  $("#fShareRequireName").addEventListener("change", () => shareInputChanged());
+  $("#fShareAllowDl").addEventListener("change", () => shareInputChanged());
+  $("#fShareWebhook").addEventListener("input", () => shareInputChanged());
   $("#fShareBase").addEventListener("input", () => shareInputChanged());
   $("#fShareBase").addEventListener("blur", () => {
     if (!$("#fShareBase").value.trim() || shareBusy) return;
@@ -2876,13 +3450,340 @@ button[disabled]{cursor:default}
     $("#fShareReveal").setAttribute("aria-pressed", String(show));
   });
   $("#fShareGo").addEventListener("click", createFolderShareLink);
-  $("#fCopyGo").addEventListener("click", copyFolderShareLink);
+  $("#fCopyGo").addEventListener("click", () => copyFolderShareLink(false));
+  $("#fCopyPassGo").addEventListener("click", () => copyFolderShareLink(true));
   $("#fSendGo").addEventListener("click", sendFolderShareLink);
+
+  // ---------- Security & Login Audit Center + Login Gate ----------
+  function secPassMsg(text = "", bad = false){
+    const el = $("#secLockMsg"); el.textContent = text; el.className = "formmsg" + (bad ? " bad" : "");
+  }
+  function secWebhookMsg(text = "", bad = false){
+    const el = $("#secWebhookMsg"); el.textContent = text; el.className = "formmsg" + (bad ? " bad" : "");
+  }
+  function openSecurity(){
+    if (!canEdit && !shareMode) return;
+    secPassMsg(); secWebhookMsg();
+    $("#secLockPass").value = "";
+    $("#secLockRequireName").checked = cfg.lockRequireName !== false;
+    $("#secWebhookUrl").value = cfg.webhook || "";
+    renderSecuritySheet();
+    openTop("#securitySheet");
+  }
+  function renderSecuritySheet(){
+    const allLogs = loadLoginLogs();
+    const q = ($("#secLogSearch").value || "").trim().toLowerCase();
+    const filter = $("#secLogFilter").value || "all";
+    const logs = allLogs.filter((e) => {
+      if (filter === "success" && e.status !== "success") return false;
+      if (filter === "failed" && e.status === "success") return false;
+      if (filter === "share" && e.mode !== "share_link") return false;
+      if (filter === "device" && e.mode !== "device_lock") return false;
+      if (!q) return true;
+      const hay = [e.user, e.note, e.folder, e.ip, e.location, e.platform, e.ua, e.status].filter(Boolean).join(" ").toLowerCase();
+      return q.split(/\s+/).every((t) => hay.includes(t));
+    });
+    const logBox = $("#secLogList");
+    const hasLockedCfg = !!(cfg.locked && cfg.encryptedToken);
+    $("#secLockStatus").textContent = hasLockedCfg
+      ? "Active: Your GitHub token on this device is encrypted with AES-256-GCM and requires your password on launch."
+      : "Not locked: Set a password below to encrypt your saved GitHub token on this device.";
+    $("#secLockRemove").hidden = !hasLockedCfg;
+    $("#secLockNow").hidden = !hasLockedCfg;
+
+    if (!logs.length){
+      logBox.replaceChildren(h("div", {class:"activity-empty", text:allLogs.length ? "No login logs match your current search/filter." : "No login attempts recorded yet. Every shared link login or device unlock will appear here with timestamp, user name, IP, location and device info."}));
+    } else {
+      const rows = logs.slice(0, 80).map((e) => {
+        const ok = e.status === "success";
+        const badge = h("span", {class:"sec-badge " + (ok ? "ok" : "bad"), text:ok ? "Success" : e.status.replace(/_/g, " ")});
+        const modeTxt = e.mode === "device_lock" ? "App Unlock" : "Shared Link";
+        const title = (e.user || "Visitor") + (e.note ? " — “" + e.note + "”" : "") + " · " + modeTxt + (e.folder ? " (“" + e.folder + "”)" : "");
+        const meta = [
+          fmtLogTime(e.t || Date.now()),
+          e.ip && e.ip !== "unavailable" ? "IP: " + e.ip : null,
+          e.location && e.location !== "unavailable" ? e.location : null,
+          e.platform || null,
+          e.screen || null,
+          e.tz || null,
+          e.lang || null
+        ].filter(Boolean).join(" · ");
+        return h("div", {class:"sec-card"},
+          h("div", {class:"sec-card-head"},
+            h("span", {class:"sec-card-title", text:title}),
+            badge
+          ),
+          h("div", {class:"sec-card-meta", text:meta}),
+          e.ua ? h("div", {class:"sec-card-meta", text:"UA: " + e.ua}) : null
+        );
+      });
+      logBox.replaceChildren(...rows);
+    }
+
+    const links = state.shareLinks || [];
+    const linkBox = $("#secLinksList");
+    if (!links.length){
+      linkBox.replaceChildren(h("div", {class:"activity-empty", text:"No tracked share links yet. Links created from the Share Folder panel will appear here so you can revoke leaked links with one click."}));
+    } else {
+      const now = Date.now();
+      const lrows = links.map((s) => {
+        const isRevoked = s.revoked || (state.shareRevokedBefore && s.createdAt <= state.shareRevokedBefore);
+        const isExpired = s.expiresAt > 0 && now > s.expiresAt;
+        const stText = isRevoked ? "Revoked" : isExpired ? "Expired" : (s.hasPassword ? "Active · AES-256" : "Active");
+        const stClass = (isRevoked || isExpired) ? "bad" : (s.hasPassword ? "ok" : "warn");
+        const details = [
+          "Created " + fmtLogTime(s.createdAt),
+          s.expiresAt ? ("Expires " + new Date(s.expiresAt).toLocaleDateString()) : "No expiry",
+          s.hasPassword ? "Password-encrypted" : "No password",
+          s.allowDl ? "Downloads allowed" : "View-only (downloads blocked)"
+        ].join(" · ");
+        return h("div", {class:"sec-card"},
+          h("div", {class:"sec-card-head"},
+            h("span", {class:"sec-card-title", text:(s.folderName || "Folder") + " (" + s.id + ")"}),
+            h("span", {class:"sec-badge " + stClass, text:stText})
+          ),
+          h("div", {class:"sec-card-meta", text:details}),
+          !isRevoked ? h("div", {class:"row", style:"margin-top:6px"},
+            h("button", {class:"btn small danger", type:"button", text:"Revoke leaked link", onclick:() => revokeShareLink(s.id)})
+          ) : null
+        );
+      });
+      linkBox.replaceChildren(...lrows);
+    }
+  }
+  function revokeShareLink(linkId){
+    const item = (state.shareLinks || []).find((s) => s.id === linkId);
+    if (!item) return;
+    item.revoked = true;
+    scheduleSave();
+    logActivity("Revoked shared link for “" + (item.folderName || item.id) + "”", "security");
+    renderSecuritySheet();
+    toast("Shared link revoked. Anyone opening it will be blocked once synced.");
+  }
+  function revokeAllShareLinks(){
+    state.shareRevokedBefore = Date.now();
+    for (const s of (state.shareLinks || [])) s.revoked = true;
+    scheduleSave();
+    logActivity("Revoked all previously created shared links", "security");
+    renderSecuritySheet();
+    toast("All existing shared links have been revoked.");
+  }
+  async function saveDevicePassword(){
+    const pass = $("#secLockPass").value;
+    if (!pass || pass.length < 4){ secPassMsg("Enter a password of at least 4 characters.", true); return; }
+    if (!cfg.token && !state.demo){ secPassMsg("Connect your repository before setting a device password.", true); return; }
+    try {
+      const tokenToProtect = state.demo ? "sample-demo-token" : cfg.token;
+      cfg.encryptedToken = await encryptPayload({token: tokenToProtect, owner: cfg.owner, repo: cfg.repo}, pass);
+      cfg.locked = true;
+      cfg.lockRequireName = $("#secLockRequireName").checked;
+      saveCfg();
+      $("#secLockPass").value = "";
+      secPassMsg("Device password saved. Your GitHub token is now AES-256 encrypted in browser storage.");
+      logActivity("Enabled AES-256 device password lock", "security");
+      renderHeader();
+      renderSecuritySheet();
+    } catch (e){
+      secPassMsg("Could not encrypt token: " + (e.message || "error"), true);
+    }
+  }
+  function removeDevicePassword(){
+    cfg.locked = false;
+    cfg.encryptedToken = null;
+    deviceLocked = false;
+    saveCfg();
+    secPassMsg("Device password removed. Token is stored in standard local storage.");
+    logActivity("Removed device password lock", "security");
+    renderHeader();
+    renderSecuritySheet();
+  }
+  function lockAppNow(){
+    if (!cfg.locked || !cfg.encryptedToken){
+      openSecurity();
+      toast("Set an App Lock password first to lock this device.");
+      return;
+    }
+    closeTop(); closeSheets();
+    cfg.token = "";
+    canEdit = false;
+    deviceLocked = true;
+    state.items = []; state.folders = [];
+    render();
+    showLoginGate("device");
+  }
+  function saveWebhookConfig(){
+    const url = $("#secWebhookUrl").value.trim();
+    if (url && !/^https:\/\//i.test(url)){ secWebhookMsg("Webhook URL must start with https://", true); return; }
+    cfg.webhook = url;
+    saveCfg();
+    secWebhookMsg(url ? "Webhook saved. Login events will be sent to this endpoint." : "Webhook cleared.");
+  }
+  async function testWebhookConfig(){
+    const url = $("#secWebhookUrl").value.trim() || cfg.webhook;
+    if (!url || !/^https:\/\//i.test(url)){ secWebhookMsg("Enter a valid https:// webhook URL first.", true); return; }
+    secWebhookMsg("Sending test login event…");
+    const entry = await recordLoginEvent({status:"test_webhook", mode:"security_test", user:"Owner (Webhook Test)", folder:"Security Center", webhook:url});
+    secWebhookMsg("Test login event recorded and dispatched (" + entry.ip + ").");
+  }
+  function exportLoginsJson(){
+    const logs = loadLoginLogs();
+    const blob = new Blob([JSON.stringify(logs, null, 2)], {type:"application/json"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "visuals-login-logs-" + stampNow() + ".json";
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    toast("Exported " + logs.length + " login records as JSON.");
+  }
+  function exportLoginsCsv(){
+    const logs = loadLoginLogs();
+    const cols = ["iso", "status", "mode", "user", "note", "folder", "linkId", "ip", "location", "isp", "platform", "screen", "tz", "lang", "ref", "ua"];
+    const escCsv = (v) => '"' + String(v ?? "").replace(/"/g, '""') + '"';
+    const lines = [cols.join(","), ...logs.map((r) => cols.map((c) => escCsv(r[c])).join(","))];
+    const blob = new Blob([lines.join("\n")], {type:"text/csv;charset=utf-8"});
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "visuals-login-logs-" + stampNow() + ".csv";
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+    toast("Exported " + logs.length + " login records as CSV.");
+  }
+  function clearLoginLogs(){
+    saveLoginLogs([]);
+    renderSecuritySheet();
+    toast("Cleared local login history.");
+  }
+
+  function loginGateMsg(text = "", bad = false){
+    const el = $("#lgMsg"); el.textContent = text; el.className = "formmsg" + (bad ? " bad" : "");
+  }
+  function showLoginGate(mode){
+    const gate = $("#loginGate");
+    gate.hidden = false;
+    loginGateMsg();
+    $("#lgPass").value = "";
+    $("#lgNote").value = "";
+    if (mode === "device"){
+      $("#lgTitle").textContent = "Unlock My Visuals";
+      $("#lgSub").textContent = "This library is protected with an AES-256 password on this device. Enter your password to decrypt your session and continue.";
+      $("#lgVisitorRow").hidden = cfg.lockRequireName === false;
+      $("#lgNoteRow").hidden = true;
+      $("#lgPassRow").hidden = false;
+      $("#lgOwnerResetRow").hidden = false;
+      $("#lgNotice").textContent = "Unlock attempts are logged with timestamp, IP address and device details in your Security & Login Logs.";
+    } else {
+      const hasPass = !!sharePayload?.enc;
+      const reqName = shareRequireName;
+      $("#lgTitle").textContent = hasPass ? "Protected Shared Folder" : "Sign In to Shared Folder";
+      $("#lgSub").textContent = hasPass
+        ? "This shared link is encrypted with a password. Enter your name and the link password to decrypt and open the folder."
+        : "Enter your name or email to open this shared folder.";
+      $("#lgVisitorRow").hidden = !reqName;
+      $("#lgNoteRow").hidden = !reqName;
+      $("#lgPassRow").hidden = !hasPass;
+      $("#lgOwnerResetRow").hidden = true;
+      $("#lgNotice").textContent = "Security notice: Opening this link records your login timestamp, entered name, IP address, approximate location and device/browser details for the folder owner.";
+    }
+    setTimeout(() => {
+      if (!$("#lgVisitorRow").hidden) $("#lgVisitor").focus();
+      else if (!$("#lgPassRow").hidden) $("#lgPass").focus();
+    }, 40);
+  }
+  async function handleLoginGateSubmit(e){
+    if (e && e.preventDefault) e.preventDefault();
+    const btn = $("#lgSubmit");
+    if (btn.disabled) return;
+    loginGateMsg();
+    const visitor = $("#lgVisitor").value.trim();
+    const note = $("#lgNote").value.trim();
+    if (deviceLocked && !shareMode){
+      if (cfg.lockRequireName !== false && !visitor){
+        loginGateMsg("Please enter your name to log in on this device.", true);
+        $("#lgVisitor").focus();
+        return;
+      }
+      const pass = $("#lgPass").value;
+      if (!pass){ loginGateMsg("Enter your device password.", true); $("#lgPass").focus(); return; }
+      btn.disabled = true; btn.textContent = "Decrypting…";
+      try {
+        const dec = await decryptPayload(cfg.encryptedToken, pass);
+        if (!dec || !dec.token) throw new Error("Invalid password");
+        if (!state.demo) cfg.token = dec.token;
+        deviceLocked = false;
+        canEdit = !!(cfg.owner && cfg.repo && (cfg.token || state.demo));
+        $("#loginGate").hidden = true;
+        recordLoginEvent({status:"success", mode:"device_lock", user:visitor || "Owner", note});
+        toast("Unlocked");
+        await start();
+      } catch (err){
+        recordLoginEvent({status:"failed_password", mode:"device_lock", user:visitor || "Unknown (Device Lock)", note});
+        loginGateMsg("Incorrect password. This attempt has been logged.", true);
+      } finally {
+        btn.disabled = false; btn.textContent = "Unlock & Log In";
+      }
+      return;
+    }
+    if (shareMode){
+      if (shareRequireName && !visitor){
+        loginGateMsg("Please enter your name or email to continue.", true);
+        $("#lgVisitor").focus();
+        return;
+      }
+      const pass = $("#lgPass").value;
+      if (sharePayload?.enc && !pass){
+        loginGateMsg("Enter the password for this shared link.", true);
+        $("#lgPass").focus();
+        return;
+      }
+      btn.disabled = true; btn.textContent = "Verifying & logging in…";
+      try {
+        if (sharePayload?.enc){
+          const dec = await decryptPayload(sharePayload, pass);
+          if (!dec || !dec.t || !dec.o || !dec.r) throw new Error("Invalid password");
+          cfg = {owner:dec.o, repo:dec.r, branch:dec.b || "main", token:dec.t, webhook:dec.wh || ""};
+          shareFolderId = dec.f || shareFolderId;
+          shareLinkId = dec.id || shareLinkId;
+          shareExpiresAt = Number(dec.exp) || shareExpiresAt;
+          shareAllowDl = dec.dl !== false;
+          shareWebhook = dec.wh || "";
+        }
+        shareVisitorName = visitor || "Visitor";
+        shareLocked = false;
+        $("#loginGate").hidden = true;
+        await start();
+        recordLoginEvent({
+          status: state.error ? "link_error" : "success",
+          mode: "share_link",
+          user: shareVisitorName,
+          note,
+          folderId: shareFolderId,
+          folder: findFolder(shareFolderId)?.name || shareFolderId,
+          linkId: shareLinkId,
+          webhook: shareWebhook
+        });
+      } catch (err){
+        recordLoginEvent({
+          status: "failed_password",
+          mode: "share_link",
+          user: visitor || "Unknown visitor",
+          note,
+          folderId: shareFolderId,
+          linkId: shareLinkId,
+          webhook: shareWebhook
+        });
+        loginGateMsg("Incorrect password for this shared link. Attempt logged.", true);
+      } finally {
+        btn.disabled = false; btn.textContent = "Unlock & Log In";
+      }
+    }
+  }
 
   // ---------- wiring ----------
   $("#searchIco").innerHTML = ICONS.search;
   $("#addIco").innerHTML = ICONS.plus;
   $("#gear").replaceChildren(icon("gear"));
+  $("#lockBtn").replaceChildren(icon("lock"));
+  $("#lgIco").replaceChildren(icon("shield"));
   $("#back").replaceChildren(icon("back"));
   $("#editFolder").replaceChildren(icon("pencil"));
   $("#newFolder").replaceChildren(icon("folderplus"), "New folder");
@@ -2890,9 +3791,10 @@ button[disabled]{cursor:default}
   $("#bTags").replaceChildren(icon("tag"), "Tags");
   $("#reorderIco").innerHTML = ICONS.grip;
   $("#activityBtn").replaceChildren(icon("activity"), "Activity");
+  $("#securityBtn").replaceChildren(icon("shield"), "Security & Logins");
   $("#shareZipBtn").replaceChildren(icon("download"), "Download folder as .zip");
   resetBulkDelete(); resetFolderDelete();
-  for (const id of ["#upClose", "#dClose", "#sClose", "#fClose", "#mClose", "#aClose", "#btClose"]) $(id).replaceChildren(icon("close"));
+  for (const id of ["#upClose", "#dClose", "#sClose", "#fClose", "#mClose", "#aClose", "#btClose", "#secClose"]) $(id).replaceChildren(icon("close"));
   for (const w of document.querySelectorAll(".selwrap")) w.append(icon("chev"));
 
   $("#q").addEventListener("input", (e) => { state.q = e.target.value; render(); });
@@ -2912,6 +3814,41 @@ button[disabled]{cursor:default}
   for (const b of document.querySelectorAll("[data-tag-mode]")) b.addEventListener("click", () => { bulkMode = b.dataset.tagMode; $("#btClear").checked = false; renderBulkTags(); });
   $("#backupBtn").addEventListener("click", backupAll);
   $("#activityBtn").addEventListener("click", openActivity);
+  $("#securityBtn").addEventListener("click", openSecurity);
+  $("#sSecurity").addEventListener("click", openSecurity);
+  $("#aOpenLogins").addEventListener("click", () => { closeTop(); openSecurity(); });
+  $("#lockBtn").addEventListener("click", lockAppNow);
+  $("#secLockSave").addEventListener("click", saveDevicePassword);
+  $("#secLockRemove").addEventListener("click", removeDevicePassword);
+  $("#secLockNow").addEventListener("click", lockAppNow);
+  $("#secLockReveal").addEventListener("click", () => {
+    const show = $("#secLockPass").type === "password";
+    $("#secLockPass").type = show ? "text" : "password";
+    $("#secLockReveal").textContent = show ? "Hide" : "Show";
+    $("#secLockReveal").setAttribute("aria-pressed", String(show));
+  });
+  $("#secWebhookSave").addEventListener("click", saveWebhookConfig);
+  $("#secWebhookTest").addEventListener("click", testWebhookConfig);
+  $("#secLogSearch").addEventListener("input", renderSecuritySheet);
+  $("#secLogFilter").addEventListener("change", renderSecuritySheet);
+  $("#secLogRefresh").addEventListener("click", async () => {
+    const ok = await fetchRepoLoginLogs();
+    renderSecuritySheet();
+    toast(ok ? "Synced login logs from repository." : "Showing local login logs.");
+  });
+  $("#secLogJson").addEventListener("click", exportLoginsJson);
+  $("#secLogCsv").addEventListener("click", exportLoginsCsv);
+  $("#secLogClear").addEventListener("click", clearLoginLogs);
+  $("#secRevokeAll").addEventListener("click", revokeAllShareLinks);
+  $("#secBackupNow").addEventListener("click", () => { closeTop(); backupAll(); });
+  $("#lgForm").addEventListener("submit", handleLoginGateSubmit);
+  $("#lgReveal").addEventListener("click", () => {
+    const show = $("#lgPass").type === "password";
+    $("#lgPass").type = show ? "text" : "password";
+    $("#lgReveal").textContent = show ? "Hide" : "Show";
+    $("#lgReveal").setAttribute("aria-pressed", String(show));
+  });
+  $("#lgResetDevice").addEventListener("click", disconnect);
   $("#storageOverview").addEventListener("click", openSettings);
   $("#sStorageTarget").addEventListener("change", updateStorageTarget);
   $("#sStorageRefresh").addEventListener("click", refreshStorage);
@@ -2931,7 +3868,7 @@ button[disabled]{cursor:default}
   $("#bDel").addEventListener("click", bulkDelete);
   $("#upGo").addEventListener("click", doUpload);
   for (const id of ["#upClose", "#dClose", "#sClose", "#backdrop"]) $(id).addEventListener("click", closeSheets);
-  for (const id of ["#fClose", "#mClose", "#aClose", "#btClose", "#backdrop2"]) $(id).addEventListener("click", closeTop);
+  for (const id of ["#fClose", "#mClose", "#aClose", "#btClose", "#secClose", "#backdrop2"]) $(id).addEventListener("click", closeTop);
   document.addEventListener("keydown", (e) => {
     const sheetOpen = !$("#backdrop").hidden;
     if (e.key === "Escape"){
@@ -3001,26 +3938,57 @@ button[disabled]{cursor:default}
   }
   async function start(){
     state.loaded = false; state.error = null; banner(""); render();
+    if (shareMode && shareExpiresAt > 0 && Date.now() > shareExpiresAt){
+      state.items = []; state.folders = []; state.loaded = true; state.error = true;
+      $("#loginGate").hidden = true;
+      banner("This shared link has expired. Ask the owner for a new link.");
+      recordLoginEvent({status:"expired_link", mode:"share_link", user:shareVisitorName || "Visitor", folderId:shareFolderId, linkId:shareLinkId, webhook:shareWebhook});
+      render();
+      return;
+    }
+    if (deviceLocked && !shareMode){
+      state.items = []; state.folders = []; state.loaded = true;
+      render();
+      showLoginGate("device");
+      return;
+    }
+    if (shareMode && shareLocked){
+      state.items = []; state.folders = []; state.loaded = true;
+      render();
+      showLoginGate("share");
+      return;
+    }
     if (!canEdit && !shareMode){ state.items = []; state.folders = []; state.loaded = true; applyRoute(); render(); return; }
     try { await loadLibrary(); }
     catch (e){
       if (e && e.status === 401){
         canEdit = false; state.items = []; state.folders = [];
-        banner(shareMode ? "This link no longer works. Ask for a new one." : "GitHub rejected your token. Open settings to reconnect.");
+        banner(shareMode ? "This link no longer works or its token was revoked. Ask for a new one." : "GitHub rejected your token. Open settings to reconnect.");
       } else state.error = true;
     }
     state.loaded = true;
     if (shareMode){
+      const linkEntry = shareLinkId ? (state.shareLinks || []).find((s) => s.id === shareLinkId) : null;
+      const revokedByEntry = !!(linkEntry && linkEntry.revoked);
+      const revokedByCut = !!(state.shareRevokedBefore && linkEntry && linkEntry.createdAt <= state.shareRevokedBefore);
+      if (revokedByEntry || revokedByCut){
+        state.items = []; state.folders = []; state.folder = null; state.error = true;
+        banner("This shared link was revoked by the owner because it may have been leaked.");
+        recordLoginEvent({status:"revoked_link", mode:"share_link", user:shareVisitorName || "Visitor", folderId:shareFolderId, linkId:shareLinkId, webhook:shareWebhook});
+        render();
+        return;
+      }
+      if (linkEntry && linkEntry.allowDl === false) shareAllowDl = false;
       const allowed = findFolder(shareFolderId) ? descendants(shareFolderId) : new Set();
       state.items = state.items.filter((i) => allowed.has(i.folder));
       state.folders = state.folders.filter((f) => allowed.has(f.id)).map((f) => f.id === shareFolderId ? {...f, parent:null} : f);
       state.folder = findFolder(shareFolderId) ? shareFolderId : null;
       applyRoute();
       if (!state.error && !state.folder) toast("This folder isn't available anymore.");
-      else if (!state.error) banner("Shared folder and subfolders · view and download only.");
+      else if (!state.error) banner("Shared folder" + (shareVisitorName ? " · signed in as " + shareVisitorName : "") + (shareAllowDl ? " · view and download only." : " · view-only (downloads disabled)."));
     } else {
       applyRoute();
-      if (state.demo) banner("Sample library · explore the features safely. Changes stay in this tab and reset on reload.");
+      if (state.demo) banner("Sample library · explore the features safely (including Security & Logins). Changes stay in this tab and reset on reload.");
     }
     render(); if (canEdit && !state.error) refreshStorage();
   }
@@ -3033,5 +4001,5 @@ button[disabled]{cursor:default}
   }
 })();
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a435a77d0ee1c08b',t:'MTc5MDc5Njc1Mw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</body>
 </html>
