@@ -6675,7 +6675,24 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     if (!canPersistFaces()){ if (canEdit && !shareMode && !state.demo && facesKnown) writeFacesPending(); return; }
     facesSaveGen++; writeFacesPending(); clearTimeout(facesTimer); facesTimer = setTimeout(() => { flushFaces(); }, 700);
   }
-  function commitFaces(){ scheduleFacesSave(); render(); if (!$("#peopleSheet").hidden) renderPeopleSheet(); if (!$("#personSheet").hidden) renderPersonSheet(); refreshDetail(); }
+  let commitFacesRAF = 0;
+  function commitFaces(){
+    scheduleFacesSave();
+    render();
+    // Batch the sheet re-renders into a single animation frame so editing
+    // (rename, split, merge, forget) doesn't flicker or thrash layout.
+    cancelAnimationFrame(commitFacesRAF);
+    commitFacesRAF = requestAnimationFrame(() => {
+      commitFacesRAF = 0;
+      if (!$("#peopleSheet").hidden) renderPeopleSheet();
+      // Guard: the person we were editing may have been merged / forgotten.
+      if (!$("#personSheet").hidden){
+        if (personEditingId && !findPerson(personEditingId)) personEditingId = "";
+        renderPersonSheet();
+      }
+      refreshDetail();
+    });
+  }
   async function putFaces(retry = true){
     const payload = facesSnapshot();
     const body = {message:"Update face recognition", branch:cfg.branch, content:textB64(JSON.stringify(payload))};
@@ -6897,7 +6914,6 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     audit("person.merge", "Merged “" + personLabel(src) + "” into “" + personLabel(target) + "”");
     commitFaces();
     toast("Merged into “" + personLabel(target) + "”.");
-    renderPersonSheet();
   }
   function toggleHidePerson(){
     const p = findPerson(personEditingId); if (!p) return;
@@ -6935,7 +6951,6 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     audit("person.split", "Moved a face out of “" + personLabel(findPerson(old) || {name:""}) + "”");
     personEditingId = person.id;
     commitFaces();
-    renderPersonSheet();
     toast("Moved to a new person. Name them if you know who it is.");
   }
   function toggleIgnoreFace(faceId){
@@ -6943,7 +6958,6 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     f.ignored = !f.ignored; f.pinned = true;
     if (f.person) recomputeCentroid(f.person);
     commitFaces();
-    renderPersonSheet();
   }
   function boxesOverlap(a, b){
     if (!a || !b) return false;
@@ -7065,7 +7079,7 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
       }
       const rows = detections.slice(0, 6).map((det) => {
         const match = VisualsFaces.matchDescriptor(det.descriptor, state.people, state.faces);
-        const near = Number.isFinite(match.distance) && match.distance <= VisualsFaces.MATCH_DISTANCE + (VisualsFaces.SOFT_MARGIN || 0.08);
+        const near = Number.isFinite(match.distance) && match.distance <= VisualsFaces.MATCH_DISTANCE + (VisualsFaces.SOFT_MARGIN || 0.10);
         const person = near ? findPerson(match.personId || match.nearestId) : null;
         const confident = !!match.personId && match.distance <= VisualsFaces.MATCH_DISTANCE;
         const dist = Number.isFinite(match.distance) ? match.distance.toFixed(2) : "";
