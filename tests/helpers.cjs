@@ -92,7 +92,8 @@ async function savedConfig(page) {
 async function mockGitHub(page, options = {}) {
   const api = {
     library: options.library || libraryFixture(), calls: [], writes: [], deletes: [],
-    tree: options.tree || repoTreeFixture(), audits: options.audits || [], logins: options.logins || [], auditConflicts: options.auditConflicts || 0
+    tree: options.tree || repoTreeFixture(), audits: options.audits || [], logins: options.logins || [], auditConflicts: options.auditConflicts || 0,
+    faces: options.faces === undefined ? null : options.faces, facesSha: options.facesSha || 'faces-sha', facesConflicts: options.facesConflicts || 0
   };
   await page.route('https://ipapi.co/**', route => route.fulfill({ json: {} }));
   await page.route('https://api.ipify.org/**', route => route.fulfill({ json: {} }));
@@ -139,6 +140,27 @@ async function mockGitHub(page, options = {}) {
       api.writes.push({ ...call, body });
       api.audits = JSON.parse(Buffer.from(body.content, 'base64').toString('utf8'));
       return json({ content: { sha: 'audit-sha-2' } });
+    }
+    if (path === 'contents/faces.json') {
+      if (req.method() === 'GET') {
+        if (options.facesStatus) return json({ message: 'Unavailable' }, options.facesStatus);
+        if (options.facesCorrupt) return json({ sha: api.facesSha, content: Buffer.from('{not json').toString('base64') });
+        if (!api.faces) return json({ message: 'Not found' }, 404);
+        if (call.accept?.includes('raw')) return json(api.faces);
+        return json({ sha: api.facesSha, ...(options.rawFaces ? {} : { content: Buffer.from(JSON.stringify(api.faces)).toString('base64') }) });
+      }
+      if (req.method() === 'PUT') {
+        const body = req.postDataJSON();
+        if (api.facesConflicts > 0) {
+          api.facesConflicts--;
+          api.calls[api.calls.length - 1].conflict = true;
+          return json({ message: 'Conflict' }, 409);
+        }
+        api.writes.push({ ...call, body });
+        api.faces = JSON.parse(Buffer.from(body.content, 'base64').toString('utf8'));
+        api.facesSha = 'faces-sha-' + api.writes.length;
+        return json({ content: { sha: api.facesSha } });
+      }
     }
     if (path.startsWith('git/trees/')) {
       return json({ truncated: false, tree: Object.entries(api.tree).map(([p, meta]) => ({ path: p, type: 'blob', size: meta.size, sha: meta.sha })) });

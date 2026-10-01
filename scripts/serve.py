@@ -6,9 +6,18 @@ from urllib.parse import unquote, urlsplit
 
 ROOT = Path(__file__).resolve().parent.parent
 PUBLIC_FILES = {
-    "index.html", "activity-log.js", "sw.js", "manifest.webmanifest", "apple-touch-icon.png",
+    "index.html", "activity-log.js", "faces.js", "sw.js", "manifest.webmanifest", "apple-touch-icon.png",
     "icon-192.png", "icon-512.png", "icon-maskable-512.png",
 }
+PUBLIC_PREFIXES = ("models/", "vendor/")
+
+
+def is_public(path):
+    if not path or path.startswith("/") or "\\" in path or ".." in path.split("/"):
+        return False
+    if path in PUBLIC_FILES:
+        return True
+    return any(path.startswith(prefix) for prefix in PUBLIC_PREFIXES)
 
 
 class AppHandler(SimpleHTTPRequestHandler):
@@ -17,7 +26,7 @@ class AppHandler(SimpleHTTPRequestHandler):
 
     def send_head(self):
         path = unquote(urlsplit(self.path).path).lstrip("/") or "index.html"
-        if path not in PUBLIC_FILES:
+        if not is_public(path):
             self.send_error(404, "File not found")
             return None
         return super().send_head()

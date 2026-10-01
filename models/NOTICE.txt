@@ -1,0 +1,21 @@
+Face recognition models shipped with My Visuals
+================================================
+
+These files are loaded only when you scan or match faces. Photos are
+processed in the browser. The models are not a remote identification service.
+
+tiny_face_detector_model
+face_landmark_68_tiny_model
+  From @vladmandic/face-api 1.7.15 (MIT). See vendor/FACE-API-LICENSE.txt.
+  The tiny face detector is a compact Tiny YOLOv2-style network trained for
+  browser face detection.
+
+face_recognition_model
+  Quantized ResNet weights published with face-api.js. The architecture and
+  original training are the dlib face-recognition model by Davis King
+  (Boost Software License). It produces a 128-number signature used only to
+  compare faces inside this library. It is not a database of identified people.
+
+TensorFlow.js, which runs the models, is bundled inside vendor/face-api.js
+and is licensed under the Apache License 2.0.
+Copyright 2018 Google LLC and the TensorFlow.js authors.
