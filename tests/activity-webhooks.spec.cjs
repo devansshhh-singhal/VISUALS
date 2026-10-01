@@ -43,13 +43,15 @@ async function openReceiver(page, overrides = {}, library = auditedLibrary()) {
 }
 
 // Real receiver actions and actual HTTP response semantics, never real credentials/endpoints.
-test('anonymous receivers send every open, quick reopen, folder visit, search and download to the owner webhook', async ({ page }) => {
+test('anonymous receivers log access and transfers but not routine browsing', async ({ page }) => {
   await seedConnection(page, { ...OWNER_CFG, webhookUrl: 'https://recipient.example/own-hook' });
   const wrongDestination = await mockWebhook(page, { url: 'https://recipient.example/own-hook' });
   const calls = await mockWebhook(page);
   const api = await openReceiver(page);
   await expect(page.locator('#banner')).toContainText('Activity notice');
   await expect.poll(() => calls.some(c => c.body.entry.kind === 'login.success')).toBe(true);
+  await page.getByRole('button', { name: 'Favorites' }).click();
+  await page.getByRole('button', { name: 'All' }).click();
 
   for (let i = 0; i < 2; i++) {
     await page.locator('[data-item-id="sunrise"] .open').click();
@@ -57,8 +59,7 @@ test('anonymous receivers send every open, quick reopen, folder visit, search an
     await page.locator('#vClose').click();
     await expect(page.locator('#viewer')).toBeHidden();
   }
-  await expect.poll(async () => (await entries(page)).filter(e => e.kind === 'view.image' && e.imageId === 'sunrise').length).toBe(2);
-  await expect.poll(async () => (await entries(page)).filter(e => e.kind === 'view.dwell' && e.imageId === 'sunrise').length).toBe(2);
+  await expect.poll(async () => (await entries(page)).filter(e => e.kind.startsWith('view.')).length).toBe(0);
   await page.locator('[data-folder-id="coast"] .open').click();
   await expect(page.locator('#title')).toHaveText('Coast');
   await page.locator('#q').fill('sea');
@@ -71,10 +72,19 @@ test('anonymous receivers send every open, quick reopen, folder visit, search an
   await download;
   await expect.poll(() => calls.some(c => c.body.entry.kind === 'download.file' && c.body.entry.status === 'success')).toBe(true);
   await expect.poll(async () => (await pending(page)).filter(t => t.url).length).toBe(0);
+  await page.locator('#vClose').click();
+  await expect(page.locator('#viewer')).toBeHidden();
 
+  await page.locator('#themeBtn').click(); // A local preference is not a receiver audit event.
   const logs = await entries(page);
-  for (const kind of ['share.open', 'share.ready', 'login.success', 'view.folder', 'search.query', 'view.image', 'view.dwell', 'view.details', 'download.file'])
+  for (const kind of ['share.open', 'login.success', 'download.file'])
     expect(logs.some(e => e.kind === kind), kind).toBe(true);
+  const receiverKinds = new Set(['share.open', 'share.error', 'login.success', 'login.failed',
+    'download.file', 'download.zip', 'image.upload']);
+  expect(logs.every(e => receiverKinds.has(e.kind))).toBe(true);
+  expect(logs.some(e => e.kind === 'search.query' || e.kind === 'view.filter' || e.kind === 'view.sort'
+    || e.kind === 'view.details' || e.kind === 'view.image' || e.kind === 'view.dwell' || e.kind.startsWith('video.')
+    || e.kind === 'share.hidden' || e.kind === 'share.leave' || e.kind === 'app.offline' || e.kind === 'settings.theme')).toBe(false);
   const sent = new Set(calls.map(c => c.body.entry.id));
   expect(logs.every(e => sent.has(e.id))).toBe(true);
   expect(logs.every(e => e.actorType === 'visitor' && e.linkId === 'test-link' && e.sessionId && e.iso && e.platform)).toBe(true);
@@ -87,6 +97,31 @@ test('anonymous receivers send every open, quick reopen, folder visit, search an
   expect(payloads).not.toContain(WRITE_TOKEN);
   expect(payloads).not.toContain('#share=');
   expect(calls.every(c => !c.headers.authorization && !c.headers.referer)).toBe(true);
+});
+
+test('shared-folder recipients cannot open owner audit, security or settings screens', async ({ page }) => {
+  // Even when this browser has an existing owner connection, the incoming link is a guest session.
+  await seedConnection(page);
+  await mockWebhook(page);
+  await openReceiver(page);
+  await expect(page.locator('#gear')).toBeHidden();
+  await expect(page.locator('#libraryTools')).toBeHidden();
+  await expect(page.locator('#settings')).toBeHidden();
+
+  await page.locator('#paletteBtn').click();
+  for (const term of ['audit', 'analytics', 'security', 'settings', 'trash']) {
+    await page.locator('#palInput').fill(term);
+    await expect(page.locator('#palList .palette-item')).toHaveCount(0);
+  }
+  await page.keyboard.press('Escape');
+
+  // Hidden static controls and the gear still cannot open owner-only panels if triggered.
+  await page.evaluate(() => {
+    for (const selector of ['#gear', '#storageOverview', '#activityBtn', '#securityBtn', '#sAudit', '#sAnalytics', '#sSecurity'])
+      document.querySelector(selector)?.click();
+  });
+  for (const selector of ['#settings', '#activitySheet', '#auditSheet', '#analyticsSheet', '#securitySheet'])
+    await expect(page.locator(selector)).toBeHidden();
 });
 
 test('new encrypted links inherit the Settings routing snapshot without exposing the GitHub token', async ({ page }) => {
@@ -187,7 +222,10 @@ test('HTTP failures remain in a durable outbox across reload/offline and resume 
   await expect.poll(async () => (await pending(page)).some(t => t.attempts === 1 && t.lastStatus === 500)).toBe(true);
   await page.evaluate(() => { window.__offline = true; window.dispatchEvent(new Event('offline')); });
   await page.locator('[data-item-id="sunrise"] .open').click();
-  await expect.poll(async () => (await pending(page)).some(t => t.entry.kind === 'view.image')).toBe(true);
+  const transfer = page.waitForEvent('download');
+  await page.locator('#vDl').click();
+  await transfer;
+  await expect.poll(async () => (await pending(page)).some(t => t.entry.kind === 'download.file')).toBe(true);
   const queuedIds = (await pending(page)).map(t => t.entry.id);
   const failedCalls = calls.length;
   // The init script resets its flag on navigation; a second script keeps this reload offline.
@@ -293,7 +331,7 @@ test('upload links retain per-file successes and limit denials and preserve the 
   await expect.poll(() => calls.some(c => c.body.entry.kind === 'image.upload')).toBe(true);
 });
 
-test('page exit persists dwell and a leave event and attempts keepalive delivery', async ({ page }) => {
+test('page exit does not audit browsing lifecycle events and still flushes pending work', async ({ page }) => {
   await mockWebhook(page);
   await page.addInitScript(() => {
     const fetch = window.fetch; window.__keepalive = [];
@@ -305,10 +343,17 @@ test('page exit persists dwell and a leave event and attempts keepalive delivery
   await openReceiver(page);
   await expect.poll(async () => (await pending(page)).filter(t => t.url).length).toBe(0);
   await page.locator('[data-item-id="sunrise"] .open').click();
-  await page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pagehide')));
-  await expect.poll(async () => (await entries(page)).some(e => e.kind === 'share.leave')).toBe(true);
-  expect((await entries(page)).some(e => e.kind === 'view.dwell' && e.note === 'page_exit')).toBe(true);
+  const before = (await entries(page)).map(e => e.id);
+  await page.evaluate(async ({ scope, url }) => {
+    const t = Date.now(), entry = { id: 'keepalive-event', t, iso: new Date(t).toISOString(), kind: 'share.open',
+      actor: 'Visitor', actorType: 'visitor', repo: scope, sessionId: 'test-session' };
+    await window.VisualsLogs.append(scope, 'audit', entry, { id: 'wh-' + entry.id, scope, url, entry, createdAt: t, nextAt: t, attempts: 0 });
+    window.dispatchEvent(new PageTransitionEvent('pagehide'));
+  }, { scope: SCOPE, url: HOOK });
   await expect.poll(() => page.evaluate(() => window.__keepalive.includes(true))).toBe(true);
+  const logs = await entries(page);
+  expect(logs.some(e => e.kind === 'share.leave' || e.kind === 'view.dwell')).toBe(false);
+  expect(logs.filter(e => e.id !== 'keepalive-event').map(e => e.id)).toEqual(expect.arrayContaining(before));
 });
 
 test('the archive, exports and repository merges retain logs beyond both old limits and handle write conflicts', async ({ page }) => {

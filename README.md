@@ -36,31 +36,28 @@ no runtime build or application backend is required.
 
 ### Receiver activity and audit history
 
-Every recorded action creates a separate, timestamped audit entry. Shared-link receiver
-entries include the link ID, repository, session ID, sequence, actor/name, folder/file,
-result/status and device/browser details. IP and approximate location are included when
-available; they are optional, not a reason to delay or discard an entry. Passwords,
-GitHub credentials and complete sharing URLs are never included in webhook payloads.
-Recipients see an activity notice on the login screen and shared-folder banner.
+Shared-link auditing is intentionally limited to security-relevant access and transfer
+outcomes. It does **not** record routine browsing such as opening or previewing a file,
+folder navigation, details panels, search text, filters, sort changes, video playback,
+viewing duration, tab background/exit, network transitions, or theme changes. Recipients
+are told what is recorded; owner-only Settings, audit, analytics and security screens are
+not available from the shared-folder interface or command palette.
 
-Receiver events include:
+Recorded receiver events include:
 
-- **Each link visit**, including anonymous/passwordless visits; successful access;
-  missing name/password, incorrect passwords, invalid/expired/revoked links, missing
-  folders, GitHub load errors and exhausted visit limits.
-- **Every file open**, including sub-second views and quick reopens; separate viewing
-  durations on file changes, closing the viewer, backgrounding the tab and page exit.
-- Folder navigation, file details, completed/debounced searches, filters and sort changes;
-  video play/pause/seek/end and load/playback failures.
-- Individual and ZIP download requests, successes, failures and permission/limit denials.
-  ZIP downloads also respect the link's download count.
-- Upload starts and **per-file** successes, failures, size/type/usage-limit denials and
-  upload-dialog cancellation.
-- Background/return/page-exit events and offline/online transitions.
+- **Link access:** link visits and successful/failed login or access attempts, including
+  incorrect passwords and invalid, expired, revoked or unavailable links. The owner can
+  optionally receive device/browser details, IP and approximate location when available.
+- **Downloads:** individual and ZIP download attempts, successes, failures and
+  permission/usage-limit denials. ZIP downloads respect the link's download count.
+- **Uploads:** upload starts and per-file successes, failures, cancellation, and
+  type/size/usage-limit denials for links that permit uploads.
 
-The existing owner audit also records edits, deletions/restores, folders, collections,
-smart folders, sharing/security/settings changes, storage checks, offline saves and log
-exports. “Recent activity” is still a short convenience view; the full audit is the archive.
+Passwords, GitHub credentials and complete sharing URLs are never included in webhook
+payloads. Owners still get audit entries for library changes (edits, deletions/restores,
+folders, collections, sharing/security/settings changes, storage checks, offline saves and
+log exports). Existing archived browsing events from older versions are retained, but new
+opens/searches/filters are not generated.
 
 - **Durable on-device history:** IndexedDB database `visuals-logs-v1` stores audit/login
   entries and every webhook delivery attempt. Audit and login histories are scoped by
@@ -113,7 +110,7 @@ A custom collector receives JSON like:
     "id": "au-example-event",
     "t": 1790812800000,
     "iso": "2026-10-01T00:00:00.000Z",
-    "kind": "view.image",
+    "kind": "download.file",
     "status": "success",
     "actorType": "visitor",
     "actor": "Visitor",
