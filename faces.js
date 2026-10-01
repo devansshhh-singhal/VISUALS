@@ -6,8 +6,18 @@
   const DIM = 128;
   // Euclidean distance on L2-normalized 128-d signatures. 0.6 is the
   // face-api / dlib calibration: at or below it, treat two faces as the same person.
-  const MATCH_DISTANCE = 0.58;
-  const SOFT_MARGIN = 0.08;
+  // Bumped from 0.58 → 0.62 to reduce over-segmentation of the same person under
+  // different lighting / angles while still keeping different people apart.
+  const MATCH_DISTANCE = 0.62;
+  const SOFT_MARGIN = 0.10;
+  // Minimum detection score. TinyFaceDetector at 0.4 produces many paper /
+  // pattern false positives; 0.55 keeps real faces while cutting most noise.
+  const MIN_SCORE = 0.55;
+  // Aspect-ratio guard: real faces sit between portrait and landscape.
+  const MIN_ASPECT = 0.35, MAX_ASPECT = 2.8;
+  // Minimum face box area as a fraction of the image (w*h). Below this the
+  // detector is usually guessing at texture.
+  const MIN_AREA = 0.003;
 
   function round4(n) { return Math.round(n * 10000) / 10000; }
 
@@ -52,12 +62,20 @@
     return out;
   }
 
+  function l2norm(v) {
+    let sum = 0;
+    for (let i = 0; i < DIM; i++) sum += v[i] * v[i];
+    return Math.sqrt(sum) || 1;
+  }
+
   function distance(a, b) {
     const da = asDescriptor(a), db = asDescriptor(b);
     if (!da || !db) return Infinity;
+    // L2-normalize both sides so quantized and raw descriptors compare fairly.
+    const na = l2norm(da), nb = l2norm(db);
     let sum = 0;
     for (let i = 0; i < DIM; i++) {
-      const d = da[i] - db[i];
+      const d = da[i] / na - db[i] / nb;
       sum += d * d;
     }
     return Math.sqrt(sum);
@@ -66,14 +84,35 @@
   function centroid(list) {
     const vecs = (list || []).map(asDescriptor).filter(Boolean);
     if (!vecs.length) return null;
+    // L2-normalize each input before averaging so one loud vector can't dominate.
+    const normed = vecs.map((v) => {
+      const n = l2norm(v);
+      const out = new Float32Array(DIM);
+      for (let i = 0; i < DIM; i++) out[i] = v[i] / n;
+      return out;
+    });
     const out = new Float32Array(DIM);
-    for (const v of vecs) for (let i = 0; i < DIM; i++) out[i] += v[i];
+    for (const v of normed) for (let i = 0; i < DIM; i++) out[i] += v[i];
     let sum = 0;
     for (let i = 0; i < DIM; i++) sum += out[i] * out[i];
     if (sum < 1e-8) return null;
     const inv = 1 / Math.sqrt(sum);
     for (let i = 0; i < DIM; i++) out[i] *= inv;
     return out;
+  }
+
+  // Minimum distance from `desc` to any face in `list`. Used as a secondary
+  // signal so a new face isn't merged into a cluster just because the centroid
+  // drifted close — it must also be close to at least one existing face.
+  function minDistanceTo(desc, list) {
+    const d0 = asDescriptor(desc);
+    if (!d0) return Infinity;
+    let best = Infinity;
+    for (const raw of list || []) {
+      const d = distance(d0, raw);
+      if (d < best) best = d;
+    }
+    return best;
   }
 
   function cleanBox(box) {
@@ -90,12 +129,12 @@
 
   function centroidsOf(people, faces) {
     const map = new Map();
+    const groups = new Map();
     for (const p of people || []) {
       if (!p || !p.id || p.hidden === "drop") continue;
       const v = p.c ? asDescriptor(p.c) : null;
       if (v) map.set(p.id, v);
     }
-    const groups = new Map();
     for (const f of faces || []) {
       if (!f || !f.person || f.ignored || !f.d) continue;
       const v = asDescriptor(f.d);
@@ -106,20 +145,31 @@
     for (const [id, list] of groups) {
       const mean = centroid(list);
       if (!mean) continue;
+      // If we already have a stored centroid, blend it with the computed mean
+      // rather than overwriting — stored centroids carry manual corrections.
       map.set(id, map.has(id) ? centroid([map.get(id), mean]) : mean);
     }
-    return map;
+    return {centroids: map, groups};
   }
 
   function matchDescriptor(descriptor, people, faces, threshold = MATCH_DISTANCE) {
     const desc = asDescriptor(descriptor);
     if (!desc) return {personId: null, distance: Infinity};
-    let personId = null, best = Infinity;
-    for (const [id, c] of centroidsOf(people, faces)) {
-      const d = distance(desc, c);
-      if (d < best) { best = d; personId = id; }
+    const {centroids, groups} = centroidsOf(people, faces);
+    let personId = null, best = Infinity, nearestId = null;
+    for (const [id, c] of centroids) {
+      const cDist = distance(desc, c);
+      // Blend centroid distance with min-distance to any face of this person.
+      // Centroid-only matching drifts; min-face-only is too noisy. The blend
+      // keeps clusters tight around real faces while still being forgiving.
+      const faceList = groups.get(id) || [];
+      const mDist = faceList.length ? minDistanceTo(desc, faceList) : cDist;
+      const score = faceList.length >= 2 ? 0.55 * cDist + 0.45 * mDist : cDist;
+      if (score < best) { best = score; personId = id; }
+      if (cDist < (nearestId === null ? Infinity : distance(desc, centroids.get(nearestId) || c))) nearestId = id;
     }
-    return {personId: best <= threshold ? personId : null, distance: best, nearestId: personId};
+    if (!nearestId) nearestId = personId;
+    return {personId: best <= threshold ? personId : null, distance: best, nearestId};
   }
 
   // Group one photo's detections against people already in the library.
@@ -136,9 +186,24 @@
       const box = cleanBox(det && det.box);
       const desc = asDescriptor(det && det.descriptor);
       if (!box || !desc) continue;
+      const score = Math.max(0, Math.min(1, Number(det.score) || 0));
+      // Skip low-confidence detections — these are usually paper / texture.
+      if (score < MIN_SCORE) continue;
       const match = matchDescriptor(desc, people, faces, threshold);
       let person = match.personId ? people.find((p) => p.id === match.personId) : null;
-      const score = Math.max(0, Math.min(1, Number(det.score) || 0));
+      // Outlier guard: if we matched a person, check the new face isn't far from
+      // most existing faces of that person. This prevents one bad match from
+      // pulling a cluster's centroid toward a different person.
+      if (person) {
+        const existing = faces.filter((f) => f.person === person.id && !f.ignored && f.d);
+        if (existing.length >= 3) {
+          const dists = existing.map((f) => distance(desc, f.d)).sort((a, b) => a - b);
+          const median = dists[Math.floor(dists.length / 2)];
+          // If the median distance to existing faces exceeds the threshold,
+          // this is probably a different person that happened to match the centroid.
+          if (median > threshold) person = null;
+        }
+      }
       if (!person && people.length >= maxPeople) {
         const unmatched = {
           id: "f-" + uid(), item: String(opts.itemId || ""), person: "",
@@ -259,8 +324,8 @@
     const el = await elementFrom(source);
     const canvas = downscale(el, opts.maxSide || 1280);
     const options = new faceapi.TinyFaceDetectorOptions({
-      inputSize: opts.inputSize || 512,
-      scoreThreshold: Number.isFinite(opts.scoreThreshold) ? opts.scoreThreshold : 0.4
+      inputSize: opts.inputSize || 608,
+      scoreThreshold: Number.isFinite(opts.scoreThreshold) ? opts.scoreThreshold : MIN_SCORE
     });
     const found = await faceapi.detectAllFaces(canvas, options).withFaceLandmarks(true).withFaceDescriptors();
     const w = canvas.width, h = canvas.height;
@@ -271,13 +336,26 @@
         score: r.detection.score,
         descriptor: Array.from(r.descriptor)
       };
-    }).map((f) => ({...f, box: cleanBox(f.box)})).filter((f) => f.box && asDescriptor(f.descriptor))
+    }).map((f) => ({...f, box: cleanBox(f.box)})).filter((f) => {
+      if (!f.box || !asDescriptor(f.descriptor)) return false;
+      // Aspect-ratio guard: real faces aren't extremely wide or extremely tall.
+      const bw = f.box[2], bh = f.box[3];
+      if (bh < 1e-4) return false;
+      const ratio = bw / bh;
+      if (ratio < MIN_ASPECT || ratio > MAX_ASPECT) return false;
+      // Minimum area: very small boxes are almost always noise.
+      if (bw * bh < MIN_AREA) return false;
+      // Score guard applied here too for callers that pass their own threshold.
+      if (f.score < MIN_SCORE) return false;
+      return true;
+    })
       .sort((a, b) => (b.box[2] * b.box[3]) - (a.box[2] * a.box[3]))
       .slice(0, 12);
   }
 
   root.VisualsFaces = {
-    DIM, MATCH_DISTANCE, SOFT_MARGIN, quantize, dequantize, distance, centroid, cleanBox,
+    DIM, MATCH_DISTANCE, SOFT_MARGIN, MIN_SCORE, MIN_ASPECT, MAX_ASPECT, MIN_AREA,
+    quantize, dequantize, distance, centroid, cleanBox, minDistanceTo,
     matchDescriptor, cluster, load, detect,
     ready: () => engineReady,
     error: () => engineError
