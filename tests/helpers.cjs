@@ -21,7 +21,7 @@ const test = base.extend({
 
 function libraryFixture() {
   return {
-    version: 3,
+    version: 5,
     folders: [
       { id: 'travel', name: 'Travel', parent: null },
       { id: 'coast', name: 'Coast', parent: 'travel' },
@@ -32,13 +32,28 @@ function libraryFixture() {
       { id: 'sea', file: 'sea.svg', name: 'Sea', folder: 'coast', type: 'image/svg+xml', size: 100 },
       { id: 'secret', file: 'secret.svg', name: 'Secret', folder: 'private', type: 'image/svg+xml', size: 100 }
     ],
-    shareLinks: [{ id: 'test-link', folderId: 'travel', createdAt: Date.now() - 60000, allowDl: true, revoked: false }],
+    trash: [],
+    collections: [],
+    smart: [],
+    shareLinks: [{ id: 'test-link', folderId: 'travel', folderName: 'Travel', createdAt: Date.now() - 60000,
+      allowDl: true, mode: 'dl', requireName: true, revoked: false }],
     shareRevokedBefore: 0
   };
 }
+// The repository side of a storage check: every blob the API would report in git/trees.
+function repoTreeFixture() {
+  return {
+    'library.json': { size: 900, sha: 'sha-lib' },
+    'images/sunrise.svg': { size: 100, sha: 'sha-i1' },
+    'images/sea.svg': { size: 200, sha: 'sha-i2' },
+    'images/secret.svg': { size: 300, sha: 'sha-i3' },
+    'images/orphan.svg': { size: 4096, sha: 'sha-orphan' }
+  };
+}
 function sharePayload(overrides = {}) {
+  // Share links carry the permission mode in `md`; older links only ever had `dl`.
   return { o: 'tester', r: 'visuals-data', b: 'main', t: READ_TOKEN, f: 'travel',
-    id: 'test-link', exp: 0, rn: false, dl: true, cat: Date.now() - 60000, ...overrides };
+    id: 'test-link', exp: 0, rn: false, dl: true, md: 'dl', cat: Date.now() - 60000, ...overrides };
 }
 function encodeShare(payload) {
   return '#share=' + Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url');
@@ -50,7 +65,8 @@ async function encryptedShare(payload, password = 'secret123', overrides = {}) {
   const key = await webcrypto.subtle.deriveKey({ name: 'PBKDF2', salt, iterations: 210000, hash: 'SHA-256' }, material,
     { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
   const encrypted = await webcrypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, Buffer.from(JSON.stringify(payload)));
-  return { enc: true, id: payload.id, f: payload.f, exp: payload.exp, rn: payload.rn, dl: payload.dl,
+  return { enc: true, id: payload.id, f: payload.f, exp: payload.exp, rn: payload.rn, dl: payload.dl, md: payload.md,
+    ...(payload.sc ? { sc: payload.sc } : {}), ...(payload.lim ? { lim: payload.lim } : {}), ...(payload.wm ? { wm: payload.wm } : {}),
     v: 2, alg: 'A256GCM', it: 210000,
     s: Buffer.from(salt).toString('base64url'), iv: Buffer.from(iv).toString('base64url'),
     ct: Buffer.from(encrypted).toString('base64url'), ...overrides };
@@ -74,7 +90,10 @@ async function savedConfig(page) {
   return page.evaluate(key => JSON.parse(localStorage.getItem(key)), STORAGE_KEY);
 }
 async function mockGitHub(page, options = {}) {
-  const api = { library: options.library || libraryFixture(), calls: [], writes: [] };
+  const api = {
+    library: options.library || libraryFixture(), calls: [], writes: [], deletes: [],
+    tree: options.tree || repoTreeFixture(), audits: []
+  };
   await page.route('https://ipapi.co/**', route => route.fulfill({ json: {} }));
   await page.route('https://api.ipify.org/**', route => route.fulfill({ json: {} }));
   await page.route('https://api.github.com/**', async route => {
@@ -102,7 +121,32 @@ async function mockGitHub(page, options = {}) {
       if (req.method() === 'GET') return json({ message: 'Not found' }, 404);
       return json({ content: { sha: 'logs-sha' } });
     }
-    if (path.startsWith('contents/images/')) return route.fulfill({ contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120"><rect width="120" height="120" fill="#4453d1"/></svg>' });
+    if (path === 'contents/audit.json') {
+      if (req.method() === 'GET') return api.audits.length ? json({ sha: 'audit-sha', content: Buffer.from(JSON.stringify(api.audits)).toString('base64') }) : json({ message: 'Not found' }, 404);
+      const body = req.postDataJSON();
+      api.writes.push({ ...call, body });
+      api.audits = JSON.parse(Buffer.from(body.content, 'base64').toString('utf8'));
+      return json({ content: { sha: 'audit-sha-2' } });
+    }
+    if (path.startsWith('git/trees/')) {
+      return json({ truncated: false, tree: Object.entries(api.tree).map(([p, meta]) => ({ path: p, type: 'blob', size: meta.size, sha: meta.sha })) });
+    }
+    if (path.startsWith('contents/images/') || path.startsWith('contents/thumbs/') || path.startsWith('contents/versions/')) {
+      const rel = path.replace(/^contents\//, '');
+      if (req.method() === 'PUT') {
+        const body = req.postDataJSON();
+        api.writes.push({ ...call, body, bytes: Buffer.from(body.content, 'base64').length });
+        api.tree[rel] = { size: Buffer.from(body.content, 'base64').length, sha: 'blob-' + Math.random().toString(36).slice(2, 8) };
+        return json({ content: { sha: api.tree[rel].sha } });
+      }
+      if (req.method() === 'DELETE') {
+        api.deletes.push({ ...call, body: req.postDataJSON() });
+        const existed = !!api.tree[rel];
+        delete api.tree[rel];
+        return json(existed ? { content: null } : { message: 'Not found' }, existed ? 200 : 404);
+      }
+      return route.fulfill({ contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120"><rect width="120" height="120" fill="#4453d1"/></svg>' });
+    }
     return json({ message: 'Not found' }, 404);
   });
   return api;
@@ -115,15 +159,28 @@ async function openOwnerFolder(page) {
   await page.locator('#folderShareBtn').click();
   await expect(page.locator('#folderSheet')).toBeVisible();
 }
-async function createLink(page, { password = null, requireName = false } = {}) {
+async function createLink(page, { password = null, requireName = false, mode = 'dl',
+  scope = '', maxViews = '', maxDls = '', maxUploads = '', watermark = '', watermarkPos = 'br',
+  expiry = '604800000' } = {}) {
   await page.locator('#fShareBase').fill('https://visuals.example/my-visuals/');
   if (password) await page.locator('#fSharePass').fill(password);
   else await page.locator('#fShareUsePass').uncheck();
   await page.locator('#fShareRequireName').setChecked(requireName);
+  await page.locator('#fShareExpiry').selectOption(expiry);
+  if (mode !== 'dl') await page.locator('#fMode' + mode[0].toUpperCase() + mode.slice(1)).click();
+  if (scope) await page.locator('#fShareScope').selectOption(scope);
+  if (maxViews) await page.locator('#fShareMaxViews').fill(String(maxViews));
+  if (maxDls) await page.locator('#fShareMaxDls').fill(String(maxDls));
+  if (maxUploads) await page.locator('#fShareMaxUploads').fill(String(maxUploads));
+  if (watermark){
+    await page.locator('#fShareWm').check();
+    await page.locator('#fShareWmText').fill(watermark);
+    await page.locator('#fShareWmPos').selectOption(watermarkPos);
+  }
   await page.locator('#fShareGo').click();
   await expect(page.locator('#fShareOut')).toBeVisible();
   return page.locator('#fShareOut').textContent();
 }
 
-module.exports = { test, expect, WRITE_TOKEN, READ_TOKEN, STORAGE_KEY, OWNER_CFG, libraryFixture,
+module.exports = { test, expect, WRITE_TOKEN, READ_TOKEN, STORAGE_KEY, OWNER_CFG, libraryFixture, repoTreeFixture,
   sharePayload, encodeShare, encryptedShare, decryptShare, seedConnection, savedConfig, mockGitHub, openOwnerFolder, createLink };
