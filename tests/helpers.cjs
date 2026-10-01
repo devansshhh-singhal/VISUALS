@@ -66,7 +66,7 @@ async function encryptedShare(payload, password = 'secret123', overrides = {}) {
     { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
   const encrypted = await webcrypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, Buffer.from(JSON.stringify(payload)));
   return { enc: true, id: payload.id, f: payload.f, exp: payload.exp, rn: payload.rn, dl: payload.dl, md: payload.md,
-    ...(payload.sc ? { sc: payload.sc } : {}), ...(payload.lim ? { lim: payload.lim } : {}), ...(payload.wm ? { wm: payload.wm } : {}),
+    ...(payload.audit ? { audit: payload.audit } : {}), ...(payload.sc ? { sc: payload.sc } : {}), ...(payload.lim ? { lim: payload.lim } : {}), ...(payload.wm ? { wm: payload.wm } : {}),
     v: 2, alg: 'A256GCM', it: 210000,
     s: Buffer.from(salt).toString('base64url'), iv: Buffer.from(iv).toString('base64url'),
     ct: Buffer.from(encrypted).toString('base64url'), ...overrides };
@@ -92,7 +92,7 @@ async function savedConfig(page) {
 async function mockGitHub(page, options = {}) {
   const api = {
     library: options.library || libraryFixture(), calls: [], writes: [], deletes: [],
-    tree: options.tree || repoTreeFixture(), audits: []
+    tree: options.tree || repoTreeFixture(), audits: options.audits || [], logins: options.logins || [], auditConflicts: options.auditConflicts || 0
   };
   await page.route('https://ipapi.co/**', route => route.fulfill({ json: {} }));
   await page.route('https://api.ipify.org/**', route => route.fulfill({ json: {} }));
@@ -118,11 +118,23 @@ async function mockGitHub(page, options = {}) {
       return json({ content: { sha: 'updated-library-sha' } });
     }
     if (path === 'contents/login-logs.json') {
-      if (req.method() === 'GET') return json({ message: 'Not found' }, 404);
+      if (req.method() === 'GET') return api.logins.length ? json({ sha: 'logs-sha', content: Buffer.from(JSON.stringify(api.logins)).toString('base64') }) : json({ message: 'Not found' }, 404);
+      const body = req.postDataJSON(); api.writes.push({ ...call, body });
+      api.logins = JSON.parse(Buffer.from(body.content, 'base64').toString('utf8'));
       return json({ content: { sha: 'logs-sha' } });
     }
     if (path === 'contents/audit.json') {
-      if (req.method() === 'GET') return api.audits.length ? json({ sha: 'audit-sha', content: Buffer.from(JSON.stringify(api.audits)).toString('base64') }) : json({ message: 'Not found' }, 404);
+      if (req.method() === 'GET') {
+        if (call.accept?.includes('raw')) return json(api.audits);
+        return api.audits.length ? json({ sha: 'audit-sha', ...(options.rawAudit ? {} : { content: Buffer.from(JSON.stringify(api.audits)).toString('base64') }) }) : json({ message: 'Not found' }, 404);
+      }
+      if (api.auditConflicts > 0) {
+        api.auditConflicts--;
+        api.audits.push(...(options.conflictEntries || []));
+        return json({ message: 'Conflict' }, 409);
+      }
+      if (options.holdAuditWrite) await options.holdAuditWrite();
+      if (options.failAuditWrite) return json({ message: 'Unavailable' }, 503);
       const body = req.postDataJSON();
       api.writes.push({ ...call, body });
       api.audits = JSON.parse(Buffer.from(body.content, 'base64').toString('utf8'));

@@ -318,6 +318,7 @@ details.info code{font-size:14px;color:var(--text)}
   transition:opacity .2s,transform .2s;
 }
 .toast.on{opacity:1;transform:translate(-50%,0)}
+.toast.on .textbtn{pointer-events:auto}
 
 .viewer{position:fixed;inset:0;z-index:18;background:var(--bg);touch-action:pan-x pinch-zoom;overscroll-behavior:contain}
 .vscroll{
@@ -1003,7 +1004,7 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     </div>
 
     <div class="sec-section" style="margin-top:14px">
-      <h3 style="font-size:15px;margin:0 0 6px">Login capture webhook</h3>
+      <h3 style="font-size:15px;margin:0 0 6px">Receiver activity webhook</h3>
       <p id="fShareWebhookStatus" class="hint" style="margin:0 0 10px"></p>
       <button class="btn small" id="fShareWebhookManage" type="button">Set or change webhook in Settings</button>
     </div>
@@ -1075,9 +1076,11 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
       <button class="btn small" id="secLogRefresh" type="button">Sync from repo</button>
       <button class="btn small" id="secLogCsv" type="button">Export .csv</button>
       <button class="btn small" id="secLogJson" type="button">Export .json</button>
-      <button class="textbtn" id="secLogClear" type="button">Clear logs</button>
+      <button class="textbtn" id="secLogClear" type="button">Clear view</button>
+      <button class="textbtn" id="secLogShowAll" type="button" hidden>Show full login history</button>
     </div>
     <div id="secLogList" class="picklist"></div>
+    <button class="btn small" id="secLogMore" type="button" hidden>Show more logins</button>
   </div>
 
   <div class="sec-section">
@@ -1101,16 +1104,19 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
   </div>
 
   <div class="sec-section">
-    <h3 id="secWebhookHeading">Remote Login Capture Webhook</h3>
-    <p class="hint" style="margin:0 0 10px">Read-only share tokens cannot write to your GitHub repo. Add a webhook URL (Discord webhook, Slack webhook, or custom HTTPS endpoint) to receive every visitor's login data in real time.</p>
+    <h3 id="secWebhookHeading">Receiver Activity Webhook</h3>
+    <p class="hint" style="margin:0 0 10px">Receive every recorded receiver visit, access attempt, file view, download and upload at one HTTPS endpoint. Failed deliveries stay in a persistent queue and retry. Custom endpoints must permit CORS and return HTTP 2xx; use a CORS-enabled relay for Slack. The URL is shared with recipients, including outside encrypted links for access-attempt logging: use a dedicated, limited-purpose endpoint, not a privileged secret.</p>
     <label class="field" style="margin-top:8px">
-      <span class="lbl">Default webhook URL for login capture</span>
+      <span class="lbl">Shared activity webhook URL</span>
       <input id="secWebhookUrl" type="url" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="https://discord.com/api/webhooks/…">
     </label>
     <div id="secWebhookMsg" class="formmsg" role="status"></div>
+    <p id="secWebhookDelivery" class="hint" role="status" aria-live="polite"></p>
     <div class="sec-actions">
       <button class="btn small" id="secWebhookSave" type="button">Save webhook</button>
-      <button class="btn small" id="secWebhookTest" type="button">Send test login</button>
+      <button class="btn small" id="secWebhookTest" type="button">Send test event</button>
+      <button class="btn small" id="secWebhookRetry" type="button">Retry pending deliveries</button>
+      <button class="btn small" id="secWebhookExport" type="button">Export delivery history</button>
     </div>
   </div>
 
@@ -1197,7 +1203,7 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     <div style="display:flex;align-items:center;gap:12px;min-width:0;flex-wrap:wrap">
       <h2 id="auTitle">Audit log</h2>
       <button class="textbtn" id="auOpenAnalytics" type="button">Analytics</button>
-      <button class="textbtn" id="auClear" type="button">Clear</button>
+      <button class="textbtn" id="auClear" type="button">Clear view</button>
     </div>
     <button class="round" id="auClose" type="button" aria-label="Close"></button>
   </div>
@@ -1219,10 +1225,12 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
   <div class="sec-actions" style="margin:0 0 12px">
     <button class="btn small" id="auSync" type="button">Sync from repo</button>
     <button class="btn small" id="auRefresh" type="button">Refresh</button>
+    <button class="btn small" id="auShowAll" type="button">Show full history</button>
     <button class="btn small" id="auCsv" type="button">Export .csv</button>
     <button class="btn small" id="auJson" type="button">Export .json</button>
   </div>
   <div id="auList" class="picklist"></div>
+  <button class="btn small" id="auMore" type="button" hidden>Show more events</button>
 </section>
 
 <section id="analyticsSheet" class="sheet top" role="dialog" aria-modal="true" aria-labelledby="anTitle" hidden>
@@ -1350,6 +1358,7 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
 
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
+<script src="activity-log.js"></script>
 <script>
 (() => {
   const $ = (s) => document.querySelector(s);
@@ -1395,7 +1404,7 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
   // Same key as before, so a device that is already connected stays connected.
   const LS = "visualsLibrary.v1";
   const CACHE = "visuals-cache-v1";
-  const AUDIT_KEY = "visuals-audit-v1", AUDIT_LIMIT = 1200;
+  const AUDIT_KEY = "visuals-audit-v1"; // History has no automatic retention cap.
   const THEME_KEY = "visuals-theme-v1", THEME_CHOICES = ["system", "light", "dark"];
   const OFFLINE_KEY = "visuals-offline-v1";
   const TRASH_DAYS = 30, TRASH_LIMIT = 200;
@@ -1404,7 +1413,10 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
   const REQUEST_TIMEOUT = 20000, FILE_TIMEOUT = 90000;
   let deviceLockKey = null, connecting = false;
   let libraryLoadController = null, libraryLoadSerial = 0;
-  let lastTelemetry = null, offlineQueued = 0;
+  let lastTelemetry = null, telemetryPromise = null, offlineQueued = 0;
+  const activitySessionId = "vs-" + (crypto.randomUUID?.() || Date.now().toString(36) + "-" + Math.random().toString(36).slice(2));
+  let activitySequence = 0, shareEntryLogged = false, shareAccessLogged = false, shareAccessNote = "";
+  const shareSessionStarted = Date.now();
   let viewerSince = 0, viewerDwellId = "";
 
   // ---------- config & Web Crypto encryption ----------
@@ -1458,7 +1470,7 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
   let deviceLocked = !!(cfg.locked && cfg.encryptedToken && !cfg.token);
   let canEdit = !!(cfg.token && cfg.owner && cfg.repo && !deviceLocked);
   let shareMode = false, shareFolderId = null, shareLocked = false, shareEnvelope = null;
-  let shareAllowDl = true, shareWebhook = "", shareLinkId = "", shareCreatedAt = 0;
+  let shareAllowDl = true, shareWebhook = "", shareAuditScope = "", shareLinkId = "", shareCreatedAt = 0;
   let shareEncrypted = false, shareRequireName = false, shareExpiresAt = 0, shareVisitorName = "", shareParseError = "";
   // Permission mode of a shared link: "view" (see only), "dl" (see + download) or "write" (see + download + upload, never delete).
   let linkMode = "dl";
@@ -1467,7 +1479,7 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
   let shareWatermark = null;            // {p,t} watermark applied to images opened through this link
   const shareModeLabel = (mode = linkMode) =>
     mode === "view" ? "view-only" : mode === "write" ? "view, download and add files" : "view and download";
-  const shareAllowsWrite = () => shareMode && linkMode === "write";
+  const shareAllowsWrite = () => shareMode && linkMode === "write" && !shareLocked && !shareParseError && !state.error;
   const canUploadNow = () => canEdit || shareAllowsWrite();   // owner devices and "write" links may add files
   const repoWriter = () => canEdit || shareAllowsWrite();     // may commit library.json with the token in use
   const shareCountKey = () => "visuals-sharecount-v1:" + repoKey() + ":" + (shareLinkId || "anon");
@@ -1636,6 +1648,8 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
   }
   // New links carry an explicit mode. Older links only carry the download flag, which maps to view/dl.
   function shareModeFromPayload(sp){
+    // An explicit download denial must never be widened by a mode field.
+    if (sp.dl === false || sp.dl === 0) return "view";
     if (sp.md === "view" || sp.md === "dl" || sp.md === "write") return sp.md;
     return (sp.dl !== false && sp.dl !== 0) ? "dl" : "view";
   }
@@ -1648,8 +1662,11 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     shareScope = typeof sp.sc === "string" ? sp.sc : "";
     shareLimits = cleanShareLimits(sp.lim) || {};
     shareWatermark = cleanShareWatermark(sp.wm) || null;
-    // Per-link webhooks from older links are ignored: the webhook now lives in Settings only.
-    shareWebhook = "";
+    // Legacy custom per-link `wh` URLs remain ignored. Only the owner Settings
+    // snapshot in a new link (and later the repository setting) routes activity.
+    const auditConfig = cleanShareAudit(sp.audit);
+    shareWebhook = auditConfig?.url || "";
+    shareAuditScope = auditConfig?.scope || "";
     shareLinkId = typeof (sp.id || sp.sid) === "string" ? (sp.id || sp.sid) : "";
     shareCreatedAt = Math.max(0, Number(sp.cat || sp.createdAt) || 0);
   }
@@ -1684,7 +1701,7 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
   }
 
   const state = {
-    items:[], folders:[], trash:[], shareLinks:[], shareRevokedBefore:0, collections:[], smart:[],
+    items:[], folders:[], trash:[], shareLinks:[], shareRevokedBefore:0, auditWebhook:null, collections:[], smart:[],
     folder:null, collectionId:"", smartId:"", tag:null, fav:false, vid:false, q:"", geo:false, loaded:false, error:null,
     openId:null, pending:[], uploading:false, sha:null, sync:"saved", select:false, sel:new Set(), sort:"date-desc",
     folderSort:"name-asc", reorder:false, gridShown:60, gridSig:"", demo:location.hash === "#demo",
@@ -1987,9 +2004,9 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     }, {timeout:method === "GET" ? REQUEST_TIMEOUT : FILE_TIMEOUT, label:method === "GET" ? "Loading from GitHub…" : "Saving to GitHub…"});
   }
   // Writes wait and retry when GitHub says "slow down", instead of failing the whole batch.
-  async function ghWrite(method, path, body){
+  async function ghWrite(method, path, body, repo = cfg){
     for (let attempt = 0; ; attempt++){
-      const r = await gh(method, path, body);
+      const r = await gh(method, path, body, repo);
       const msg = String((r.json && r.json.message) || "").toLowerCase();
       const ra = r.headers && r.headers.get ? r.headers.get("retry-after") : null;
       r.limited = r.status === 429 || (r.status === 403 && (/rate limit|abuse|secondary/.test(msg) || !!ra));
@@ -2011,6 +2028,26 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     if (Number.isFinite(lat) && Number.isFinite(lon) && Math.abs(lat) <= 90 && Math.abs(lon) <= 180 && (lat || lon))
       out.gps = {lat:Math.round(lat * 1e5) / 1e5, lon:Math.round(lon * 1e5) / 1e5};
     return Object.keys(out).length ? out : undefined;
+  }
+  function webhookAddress(value){
+    const raw = typeof value === "string" ? value.trim() : "";
+    if (!raw || raw.length > 2048) return "";
+    try {
+      const url = new URL(raw);
+      if (url.protocol !== "https:" || !url.hostname || url.username || url.password || url.hash) return "";
+      return url.href;
+    } catch (e){ return ""; }
+  }
+  function cleanShareAudit(a){
+    if (!a || a.v !== 1 || typeof a.scope !== "string" || !/^[^/\s]+\/[^/@\s]+@[^\s]+$/.test(a.scope) || a.scope.length > 240) return null;
+    const url = webhookAddress(a.url);
+    return url ? {v:1, url, scope:a.scope} : null;
+  }
+  function cleanAuditWebhook(a){
+    if (!a || a.v !== 1 || typeof a.url !== "string") return null;
+    const url = webhookAddress(a.url);
+    if (a.url.trim() && !url) return null;
+    return {v:1, url, updatedAt:Math.max(0, Number(a.updatedAt) || 0)};
   }
   function cleanShareLimits(l){
     if (!l || typeof l !== "object") return undefined;
@@ -2087,6 +2124,7 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
       trash:(state.trash || []).map((t) => ({item:clean(t.item), at:Number(t.at) || Date.now(), by:String(t.by || "Owner").slice(0, 80)})),
       shareLinks:(state.shareLinks || []).map(cleanShareLink),
       shareRevokedBefore:Number(state.shareRevokedBefore) || 0,
+      auditWebhook:cleanAuditWebhook(state.auditWebhook),
       collections:(state.collections || []).map(cleanCollection),
       smart:(state.smart || []).map(cleanSmart)
     };
@@ -2146,7 +2184,7 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     const smart = (Array.isArray(d.smart) ? d.smart : [])
       .filter((x) => { if (!x || typeof x.id !== "string" || !x.id || seenY.has(x.id)) return false; seenY.add(x.id); return true; })
       .map(cleanSmart);
-    return {folders, items, shareLinks, shareRevokedBefore, trash, collections, smart};
+    return {folders, items, shareLinks, shareRevokedBefore, auditWebhook:cleanAuditWebhook(d.auditWebhook), trash, collections, smart};
   }
 
   async function fetchLibrary(signal){
@@ -2172,6 +2210,17 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     const n = norm(data);
     state.sha = sha; state.items = n.items; state.folders = n.folders;
     state.shareLinks = n.shareLinks; state.shareRevokedBefore = n.shareRevokedBefore;
+    state.auditWebhook = n.auditWebhook;
+    if (shareMode){
+      if (n.auditWebhook) shareWebhook = n.auditWebhook.url;
+      await bindShareActivityWebhook();
+    } else if (n.auditWebhook){
+      cfg.webhookUrl = n.auditWebhook.url; saveCfg();
+    } else if (canEdit && webhookAddress(cfg.webhookUrl)){
+      // Publish an existing device-only setting for older links, too.
+      state.auditWebhook = {v:1, url:webhookAddress(cfg.webhookUrl), updatedAt:Date.now()};
+      scheduleSave();
+    }
     state.collections = n.collections; state.smart = n.smart;
     if (state.collectionId && !state.collections.some((c) => c.id === state.collectionId)) state.collectionId = "";
     if (state.smartId && !state.smart.some((x) => x.id === state.smartId)) state.smartId = "";
@@ -2194,6 +2243,10 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     }
     state.shareLinks = [...linkMap.values()].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
     state.shareRevokedBefore = Math.max(Number(state.shareRevokedBefore) || 0, Number(remote.shareRevokedBefore) || 0);
+    if (remote.auditWebhook && (!state.auditWebhook || remote.auditWebhook.updatedAt > state.auditWebhook.updatedAt)){
+      state.auditWebhook = remote.auditWebhook;
+      if (!shareMode){ cfg.webhookUrl = remote.auditWebhook.url; saveCfg(); }
+    }
     const liveIds = new Set(state.items.map((i) => i.id));
     const cMap = new Map((state.collections || []).map((c) => [c.id, c]));
     for (const rc of (remote.collections || [])){
@@ -2235,7 +2288,7 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
       lastAt:Number(counters.lastAt) || Number(s.stats && s.stats.lastAt) || 0}});
     const shareLinks = (remote.shareLinks || []).map((s2) => s2 && s2.id === shareLinkId ? statsLink(s2) : s2);
     return {version:5, folders, items, trash:remote.trash || [], shareLinks, shareRevokedBefore:Number(remote.shareRevokedBefore) || 0,
-      collections:remote.collections || [], smart:remote.smart || []};
+      auditWebhook:remote.auditWebhook, collections:remote.collections || [], smart:remote.smart || []};
   }
   async function putLibrary(retry = true){
     const payload = shareAllowsWrite() ? await shareSnapshotFor() : librarySnapshot();
@@ -2370,6 +2423,7 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
 
   // ---------- navigation ----------
   function applyRoute(){
+    const previousFolder = state.folder;
     let id = null;
     if (shareMode) id = history.state?.sharedFolder || shareRootFolder();
     else if (state.demo) id = history.state?.demoFolder || null;
@@ -2398,12 +2452,14 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
       exitSelect();
     }
     state.folder = id; readView();
+    if (shareMode && state.loaded && !state.error && previousFolder !== id && id) audit("view.folder", "Viewed folder “" + folderPath(id) + "”", {count:visible().length});
   }
   function navigate(id){
     id = findFolder(id) ? id : null;
     state.collectionId = ""; state.smartId = "";
     if (shareMode && !id) id = findFolder(shareRootFolder()) ? shareRootFolder() : null;
     if (id === state.folder) return;
+    flushSearchActivity();
     cancelDrag(); state.reorder = false; exitSelect();
     state.tag = null; state.fav = false; state.vid = false; state.geo = false; state.q = ""; $("#q").value = "";
     try {
@@ -2412,6 +2468,7 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
       else history.pushState({folder:id}, "", id ? "#f=" + enc(id) : location.pathname + location.search);
     } catch (e) {}
     state.folder = id; readView(); render(); window.scrollTo(0, 0);
+    if (shareMode && id) audit("view.folder", "Viewed folder “" + folderPath(id) + "”", {count:visible().length});
   }
 
   // Fragment-only navigation does not rerun this script. Reload when entering,
@@ -2743,17 +2800,17 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     const hasGeo = scope.some((i) => i.exif && i.exif.gps);
     if (state.geo && !hasGeo) state.geo = false;
     box.hidden = !state.loaded || scope.length === 0;
-    const reset = () => { state.tag = null; state.fav = false; state.vid = false; state.geo = false; render(); };
+    const reset = () => { state.tag = null; state.fav = false; state.vid = false; state.geo = false; render(); logVisitorFilter("All", true); };
     box.replaceChildren(
       h("button", {class:"chip", type:"button", "aria-pressed": String(!state.tag && !state.fav && !state.vid && !state.geo), text:"All", onclick:reset}),
       h("button", {class:"chip", type:"button", "aria-pressed": String(state.fav),
-        onclick:() => { state.fav = !state.fav; render(); }}, icon("heart"), "Favorites"),
+        onclick:() => { state.fav = !state.fav; render(); logVisitorFilter("Favorites", state.fav); }}, icon("heart"), "Favorites"),
       ...(hasVid ? [h("button", {class:"chip", type:"button", "aria-pressed": String(state.vid),
-        onclick:() => { state.vid = !state.vid; render(); }}, icon("video"), "Videos")] : []),
+        onclick:() => { state.vid = !state.vid; render(); logVisitorFilter("Videos", state.vid); }}, icon("video"), "Videos")] : []),
       ...(hasGeo ? [h("button", {class:"chip", type:"button", "aria-pressed": String(state.geo),
-        onclick:() => { state.geo = !state.geo; render(); }}, icon("info"), "Geotagged")] : []),
+        onclick:() => { state.geo = !state.geo; render(); logVisitorFilter("Geotagged", state.geo); }}, icon("info"), "Geotagged")] : []),
       ...counts.map(([t, n]) => h("button", {class:"chip", type:"button", "aria-pressed": String(state.tag === t),
-        onclick:() => { state.tag = state.tag === t ? null : t; render(); }}, t, h("small", {text:String(n)})))
+        onclick:() => { state.tag = state.tag === t ? null : t; render(); logVisitorFilter("Tag “" + t + "”", state.tag === t); }}, t, h("small", {text:String(n)})))
     );
     box.scrollLeft = left;
   }
@@ -3079,7 +3136,12 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     if (zipBusy) return;
     if (shareMode && !shareAllowDl){
       toast("Downloads are disabled for this shared link.");
-      audit("download.zip", "Blocked a folder ZIP download: downloads are disabled for this link", {note:"blocked", folderId:folderId || ""});
+      audit("download.zip", "Blocked a folder ZIP download: downloads are disabled for this link", {note:"downloads_disabled", status:"blocked", folderId:folderId || ""});
+      return;
+    }
+    if (shareMode && shareLimitHit("dls")){
+      toast(shareLimitMessage("dls"));
+      audit("download.zip", "Blocked a folder ZIP download: " + shareLimitMessage("dls"), {folderId:folderId || "", status:"blocked", note:"download_limit"});
       return;
     }
     if (state.uploading){ toast("Finish uploading before making a backup."); return; }
@@ -3087,6 +3149,7 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     if (typeof JSZip === "undefined"){ toast("The bundled ZIP tool is unavailable."); return; }
     const finish = beginLoading(full ? "Preparing library backup…" : "Preparing folder download…");
     zipBusy = true; setZipStatus("Preparing a complete snapshot…");
+    audit("download.zip", "Requested a " + (full ? "library backup" : "folder ZIP"), {folderId:folderId || "", status:"started"});
     const controller = new AbortController();
     try {
       // Wait for the current write and any edits made during it; never label an unsaved snapshot a full backup.
@@ -3113,6 +3176,8 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
         zip.file("library.json", JSON.stringify(snapshot, null, 2), {compression:"DEFLATE"});
         zip.file("activity.json", JSON.stringify(loadActivity(), null, 2), {compression:"DEFLATE"});
         zip.file("login-logs.json", JSON.stringify(loadLoginLogs(), null, 2), {compression:"DEFLATE"});
+        zip.file("audit.json", JSON.stringify(loadAudit(), null, 2), {compression:"DEFLATE"});
+        zip.file("webhook-attempts.json", JSON.stringify(await logStore.attempts(activityScope()), null, 2), {compression:"DEFLATE"});
         zip.file("backup.json", JSON.stringify({format:"visuals-library-backup", formatVersion:1, createdAt,
           source:{owner:cfg.owner, repository:cfg.repo, branch:cfg.branch},
           contents:{items:list.length, folders:folders.length, originals:new Set(list.map((i) => i.file)).size, previews:new Set(list.filter((i) => i.thumb).map((i) => i.thumb)).size, loginLogs:loadLoginLogs().length},
@@ -3157,6 +3222,7 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
       const day = new Date().toLocaleDateString("en-CA").replace(/[^0-9-]/g, "-");
       const zipName = full ? safeName(cfg.repo || "library") + "-backup-" + day + ".zip" : safeName(root.name) + ".zip";
       downloadBlob(blob, zipName);
+      if (shareMode) bumpShareCounter("dls");
       const msg = (full ? "Full library backup" : "Folder “" + root.name + "” export") + " downloaded · " + plural(list.length, "file", "files");
       setZipStatus(msg); toast(msg);
       audit("download.zip", (full ? "Downloaded a full library backup" : "Downloaded “" + root.name + "” as a ZIP") + " · " + plural(list.length, "file", "files"), {count:list.length, folderId:full ? "" : root.id});
@@ -3165,6 +3231,7 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
       controller.abort();
       const msg = "Backup stopped: " + (e.message || "download failed") + ". No incomplete ZIP was downloaded.";
       setZipStatus(msg); toast(msg);
+      audit("download.zip", msg, {folderId:folderId || "", status:"failed", note:e.name || "zip_error"});
     } finally { finish(); zipBusy = false; renderZipState(); }
   }
   function zipFolder(folderId){ return runZip(false, folderId); }
@@ -3458,6 +3525,7 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
   }
   function openDetail(id){
     const it = find(id); if (!it) return;
+    audit("view.details", "Opened details for “" + (it.name || "file") + "”", {imageId:it.id, imageName:it.name});
     state.openId = id;
     const img = $("#dImg");
     img.removeAttribute("src"); img.alt = it.name || "";
@@ -3528,16 +3596,17 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     if (shareMode && !shareAllowDl){
       toast("Downloads are disabled for this shared link.");
       audit("download.file", "Blocked a download of “" + ((target && target.name) || "file") + "”: downloads are disabled for this link",
-        {imageId:id, imageName:target ? target.name : "", note:"blocked"});
+        {imageId:id, imageName:target ? target.name : "", note:"downloads_disabled", status:"blocked"});
       return;
     }
     const it = target; if (!it) return;
     if (shareMode && shareLimitHit("dls")){
       toast(shareLimitMessage("dls"));
       audit("download.file", "Blocked a download of “" + (it.name || "file") + "”: " + shareLimitMessage("dls"),
-        {imageId:it.id, imageName:it.name, note:"blocked"});
+        {imageId:it.id, imageName:it.name, note:"download_limit", status:"blocked"});
       return;
     }
+    audit("download.file", "Requested download of “" + (it.name || "file") + "”", {imageId:it.id, imageName:it.name, status:"started"});
     try {
       if (isVideo(it) && !peek(it, false)) toast("Getting the video…");
       const a = document.createElement("a");
@@ -3552,7 +3621,7 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
       document.body.append(a); a.click(); a.remove();
       if (shareMode) bumpShareCounter("dls");
       audit("download.file", "Downloaded “" + (it.name || "file") + "”" + (shareWatermark && !isVideo(it) ? " (watermarked)" : ""), {imageId:it.id, imageName:it.name});
-    } catch (e) { toast("Couldn't download this file."); }
+    } catch (e) { toast("Couldn't download this file."); audit("download.file", "Could not download “" + (it.name || "file") + "”", {imageId:it.id, imageName:it.name, status:"failed", note:e.name || "download_error"}); }
   }
   function remove(){
     const it = find(state.openId); if (!it || !canEdit) return;
@@ -3857,10 +3926,16 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     return m ? (BY_EXT[m[1].toLowerCase()] || null) : null;
   }
   function takeFiles(files){
-    if (!canUploadNow() || state.uploading) return;
+    if (!canUploadNow() || state.uploading){
+      if (shareMode) for (const file of files) audit("image.upload", "Blocked upload of “" + file.name + "”", {imageName:file.name, bytes:file.size, status:"blocked", note:"uploads_not_allowed"});
+      return;
+    }
     const ok = [], bad = [];
     for (const f of files){ const type = normType(f); if (type) ok.push({file:f, type}); else bad.push(f); }
-    if (bad.length) toast(plural(bad.length, "file", "files") + " skipped. Use PNG, JPG, GIF, WebP, SVG, AVIF, HEIC, MP4, WebM or MOV.");
+    if (bad.length){
+      toast(plural(bad.length, "file", "files") + " skipped. Use PNG, JPG, GIF, WebP, SVG, AVIF, HEIC, MP4, WebM or MOV.");
+      for (const file of bad) audit("image.upload", "Skipped unsupported upload “" + file.name + "”", {imageName:file.name, bytes:file.size, status:"blocked", note:"unsupported_file_type"});
+    }
     if (ok.length) openUpload(ok);
   }
   function openUpload(list){
@@ -3902,19 +3977,30 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     const added = []; let order = nextOrder(folder); let failed = 0, tooBig = 0, slow = 0, fatal = null, limitStopped = false;
     for (let i = 0; i < n; i++){
       const {file, type} = list[i];
+      const fileLog = {imageName:baseName(file.name), folderId:folder || "", folder:folder ? folderPath(folder) : "", bytes:file.size};
+      audit("image.upload", "Started upload of “" + baseName(file.name) + "”", {...fileLog, status:"started"});
       $("#upStatus").textContent = "Uploading " + (i + 1) + " of " + n + "…" + (isVideoType(type) ? " (videos can take a minute)" : "");
       try {
         const blob = doShrink ? await shrink(file, type) : file;
         const mbLimit = shareMode && Number(shareLimits.mb) > 0 ? Number(shareLimits.mb) * 1048576 : 0;
-        if (blob.size > limitFor(type) || (mbLimit && blob.size > mbLimit)){ tooBig++; continue; }
-        if (shareMode && shareLimitHit("ups")){ limitStopped = true; failed += n - i; break; }
+        if (blob.size > limitFor(type) || (mbLimit && blob.size > mbLimit)){ tooBig++; audit("image.upload", "Blocked upload of “" + baseName(file.name) + "”: file too large", {...fileLog, status:"blocked", note:"size_limit"}); continue; }
+        if (shareMode && shareLimitHit("ups")){
+          limitStopped = true; failed += n - i;
+          for (const remaining of list.slice(i)) audit("image.upload", "Blocked upload of “" + baseName(remaining.file.name) + "”: " + shareLimitMessage("ups"),
+            {...fileLog, imageName:baseName(remaining.file.name), bytes:remaining.file.size, status:"blocked", note:"upload_limit"});
+          break;
+        }
         const id = uid();
         const name = slug(file.name) + "-" + id + "." + EXT[type];
         const r = await ghWrite("PUT", "contents/images/" + name, {message:"Add " + name, branch:cfg.branch, content: await blobB64(blob)});
         if (!r.ok){
-          if (r.status === 401 || r.status === 404 || (r.status === 403 && !r.limited)){ fatal = r.status; failed += n - i; break; }
-          // A visitor on an upload link only ever learns that adding files failed.
-          if (shareMode) { fatal = r.status; failed += n - i; break; }
+          audit("image.upload", "Could not upload “" + baseName(file.name) + "”", {...fileLog, status:"failed", note:"HTTP " + r.status});
+          if (shareMode || r.status === 401 || r.status === 404 || (r.status === 403 && !r.limited)){
+            fatal = r.status; failed += n - i;
+            for (const remaining of list.slice(i + 1)) audit("image.upload", "Upload stopped before “" + baseName(remaining.file.name) + "”",
+              {...fileLog, imageName:baseName(remaining.file.name), bytes:remaining.file.size, status:"cancelled", note:"batch_stopped"});
+            break;
+          }
           if (r.limited) slow++;
           failed++; continue;
         }
@@ -3930,7 +4016,8 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
         const exif = cleanExif({...(rawExif || {}), w:(rawExif && rawExif.w) || (t && t.w), h:(rawExif && rawExif.h) || (t && t.h)});
         if (shareMode) bumpShareCounter("ups");
         added.push({id, file:name, lqip:lqip || undefined, name:baseName(file.name), tags, fav:false, folder, order:order++, thumbSize:thumb && t ? t.blob.size : 0, createdAt:Date.now() + (n - i), updatedAt:Date.now(), size:blob.size, type, sha:r.json.content.sha, thumb, dur, exif, _url:URL.createObjectURL(blob), _turl: t ? URL.createObjectURL(t.blob) : undefined});
-      } catch (e) { failed++; }
+        audit("image.upload", "Uploaded “" + baseName(file.name) + "”", {...fileLog, imageId:id, bytes:blob.size, count:1});
+      } catch (e) { failed++; audit("image.upload", "Could not upload “" + baseName(file.name) + "”", {...fileLog, status:"failed", note:e.name || "upload_error"}); }
     }
     finish(); state.uploading = false; $("#upClose").disabled = false;
     if (added.length){
@@ -3946,7 +4033,7 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
       : " failed: " + (fatal === 404 ? "repo not found, check settings." : "token lacks write access."))
       : slow ? " were slowed down by GitHub. Try those again in a minute." : " didn't upload.");
     toast(msg);
-    if (added.length) logActivity(itemsLabel(added) + " added" + (folder ? " to " + folderName(folder) : "") + (shareMode ? " through a visitor upload link" : ""), "upload",
+    if (added.length && canEdit) logActivity(itemsLabel(added) + " added" + (folder ? " to " + folderName(folder) : "") + (shareMode ? " through a visitor upload link" : ""), "upload",
       {kind:"image.upload", folderId:folder || "", folder:folder ? folderPath(folder) : "", count:added.length});
   }
 
@@ -4185,7 +4272,7 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
   }
 
   // ---------- viewer (swipe through images like a gallery) ----------
-  const viewer = {open:false, ids:[], idx:0, pushed:false, raf:0};
+  const viewer = {open:false, ids:[], idx:0, pushed:false, raf:0, serial:0};
   const vScroll = () => $("#vScroll");
   const reduceMotion = () => !!(window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches);
   function buildSlides(){
@@ -4205,7 +4292,10 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     }
     if (full && !img.dataset.loading){
       img.dataset.loading = "1";
-      getUrl(it, false, true).then((u) => { img.src = u; img.dataset.q = "full"; }, () => { delete img.dataset.loading; });
+      getUrl(it, false, true).then((u) => { img.src = u; img.dataset.q = "full"; }, () => {
+        delete img.dataset.loading;
+        if (viewer.open && viewer.ids[viewer.idx] === it.id) audit("view.error", "Could not load file “" + (it.name || "file") + "”", {imageId:it.id, imageName:it.name, status:"failed"});
+      });
     }
   }
   function updateViewer(){
@@ -4224,27 +4314,28 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     ensureSlide(i - 1, true); ensureSlide(i + 1, true);   // neighbours are ready before you swipe
     pauseOthers();
   }
-  let viewLogged = null;
-  function flushViewerDwell(){
+  function flushViewerDwell(reason = "closed"){
     const id = viewerDwellId, since = viewerSince;
     viewerDwellId = ""; viewerSince = 0;
     if (!id || !since) return;
-    const ms = Date.now() - since, it = find(id);
-    if (!it || ms < 700) return;
-    if (viewLogged && viewLogged.id === id && Date.now() - viewLogged.t < 60000) return;   // collapsing quick re-opens
-    viewLogged = {id, t:Date.now()};
-    audit("view.image", "Viewed “" + (it.name || "file") + "” for " + fmtTime(Math.max(1, Math.round(ms / 1000))), {imageId:it.id, imageName:it.name, ms});
+    const it = find(id); if (!it) return;
+    const ms = Math.max(0, Date.now() - since);
+    audit("view.dwell", "Viewed “" + (it.name || "file") + "” for " + fmtTime(Math.round(ms / 1000)),
+      {imageId:it.id, imageName:it.name, ms, note:reason});
   }
   function noteViewerDwell(it){
     if (!it || viewerDwellId === it.id) return;
-    flushViewerDwell();
+    flushViewerDwell("next_file");
     viewerDwellId = it.id; viewerSince = Date.now();
+    // Record the open immediately. Fast reopens and sub-second views are distinct
+    // actions, not collapsed or dropped while waiting for a dwell-time threshold.
+    audit("view.image", "Opened “" + (it.name || "file") + "”", {imageId:it.id, imageName:it.name});
   }
   function openViewer(id){
     const ids = visible().map((i) => i.id), idx = ids.indexOf(id);
     if (idx < 0) return;
     if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
-    viewer.ids = ids; viewer.idx = idx; viewer.open = true;
+    viewer.ids = ids; viewer.idx = idx; viewer.open = true; viewer.serial++;
     buildSlides();
     $("#viewer").classList.remove("hide-ui");
     $("#viewer").hidden = false; document.body.classList.add("lock");
@@ -4266,8 +4357,9 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
   function closeViewer(){
     if (!viewer.open) return;
     if (viewer.pushed){
+      const closingSerial = viewer.serial;
       history.back();                                  // pops the entry we added; popstate then hides the viewer
-      setTimeout(() => { if (viewer.open) hideViewer(); }, 300);
+      setTimeout(() => { if (viewer.open && viewer.serial === closingSerial) hideViewer(); }, 300);
     } else hideViewer();
   }
   function goView(d){
@@ -4312,6 +4404,7 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
       if (slide.isConnected) buildPlayer(slide, it, url);
     } catch (e) {
       delete slide.dataset.loading; btn.disabled = false; hint.textContent = "Couldn't load. Tap to retry";
+      audit("video.error", "Could not load video “" + (it.name || "file") + "”", {imageId:it.id, imageName:it.name, status:"failed"});
     }
   }
   function buildPlayer(slide, it, url){
@@ -4335,7 +4428,12 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     const toggle = () => { if (v.paused){ const pr = v.play(); if (pr && pr.catch) pr.catch(() => {}); } else v.pause(); };
     v.addEventListener("click", toggle);
     play.addEventListener("click", toggle);
-    for (const ev of ["play", "pause", "ended"]) v.addEventListener(ev, setIcon);
+    for (const ev of ["play", "pause", "ended"]) v.addEventListener(ev, () => {
+      setIcon();
+      audit("video." + ev, (ev === "play" ? "Played" : ev === "pause" ? "Paused" : "Finished") + " video “" + (it.name || "file") + "”",
+        {imageId:it.id, imageName:it.name, position:Math.round(v.currentTime * 1000)});
+    });
+    v.addEventListener("seeked", () => audit("video.seek", "Seeked video “" + (it.name || "file") + "”", {imageId:it.id, imageName:it.name, position:Math.round(v.currentTime * 1000)}));
     v.addEventListener("timeupdate", paint); v.addEventListener("loadedmetadata", paint);
     const endDrag = () => { dragging = false; };
     seek.addEventListener("pointerdown", () => { dragging = true; });
@@ -4352,6 +4450,7 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     });
     v.addEventListener("error", () => {
       if (!v.getAttribute("src")) return;
+      audit("video.error", "Could not play video “" + (it.name || "file") + "”", {imageId:it.id, imageName:it.name, status:"failed"});
       slide.dataset.kind = "video-error"; delete slide.dataset.vpath;
       slide.replaceChildren(h("div", {class:"vposter"}, h("div", {class:"vover"}, icon("video"),
         h("div", {class:"vhint", text:"This browser can't play this video. Use Download instead."}))));
@@ -4530,14 +4629,14 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
   function resetRepoSession(){
     cancelShareCheck(true);
     libraryLoadController?.abort(); libraryLoadSerial++;
-    repoSession++; clearTimeout(saveTimer); cancelDrag(); state.reorder = false; exitSelect();
+    repoSession++; clearTimeout(saveTimer); clearTimeout(auditSyncTimer); auditSyncTimer = 0; auditSyncVersion = 0; auditSyncedVersion = 0; cancelDrag(); state.reorder = false; exitSelect();
     saveVersion = 0; savedVersion = 0; state.sync = "saved";
     deleted.items.clear(); deleted.folders.clear(); pendingDel.length = 0;
     state.storage = {bytes:null, loading:false, error:false, checkedAt:0}; zipMessage = "";
     for (const it of state.items) for (const key of ["_url", "_turl"]) if (it[key]) URL.revokeObjectURL(it[key]);
     urlCache.forEach((u) => URL.revokeObjectURL(u)); urlCache.clear();
     videoUrls.forEach((u) => URL.revokeObjectURL(u)); videoUrls.clear();
-    state.items = []; state.folders = []; state.shareLinks = []; state.shareRevokedBefore = 0; state.folder = null; state.sha = null;
+    state.items = []; state.folders = []; state.shareLinks = []; state.shareRevokedBefore = 0; state.auditWebhook = null; state.folder = null; state.sha = null;
     state.tag = null; state.fav = false; state.vid = false; state.q = ""; $("#q").value = "";
   }
 
@@ -4777,140 +4876,189 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     start();
   }
 
-  // ---------- login telemetry, audit log & security center ----------
+  // ---------- durable activity history, telemetry and security center ----------
   const LOGIN_LOG_KEY = "visuals-login-logs-v1";
+  const logStore = window.VisualsLogs;
+  const auditCache = new Map(), loginCache = new Map(), hydratedLogScopes = new Map(), pendingAuditWrites = new Map(), activityScopeAliases = new Map();
   const fmtLogTime = (t) => new Date(Number(t) || Date.now()).toLocaleString();
   const stampNow = () => new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
-  function loadLoginLogs(){
+  const logId = (prefix) => prefix + (crypto.randomUUID?.() || Date.now().toString(36) + "-" + uid());
+  function activityScope(){
+    if (cfg.owner && cfg.repo) return repoKey();
+    return shareMode ? shareAuditScope || "share:" + (shareLinkId || activitySessionId) : "device:unconnected";
+  }
+  function mergedLogEntries(...lists){
+    const map = new Map();
+    for (const list of lists) for (const e of list) if (e && typeof e.id === "string" && e.id && !map.has(e.id)) map.set(e.id, e);
+    // A stale local mirror must not erase telemetry already enriched in the archive.
+    for (const list of lists) for (const e of list){
+      const current = e && map.get(e.id); if (!current) continue;
+      for (const k of ["ip","location","isp","platform","screen","ua","tz","lang","ref"])
+        if ((!current[k] || current[k] === "unavailable") && e[k] && e[k] !== "unavailable") current[k] = e[k];
+    }
+    return [...map.values()].sort((a, b) => b.t - a.t || (Number(b.sequence) || 0) - (Number(a.sequence) || 0) || a.id.localeCompare(b.id));
+  }
+  function resolvedActivityScope(scope){ return activityScopeAliases.get(scope) || scope; }
+  function loginKey(scope = activityScope()){ return LOGIN_LOG_KEY + ":" + scope; }
+  function cleanLogin(e){
+    if (!e || typeof e.id !== "string" || !e.id) return null;
+    const t = Number(e.t); if (!Number.isFinite(t) || t <= 0 || t > 8640000000000000) return null;
+    const entry = {id:e.id.slice(0, 100), t, iso:new Date(t).toISOString(), status:safeLogText(e.status || "unknown", 40), mode:safeLogText(e.mode || "unknown", 40), user:safeLogText(e.user || "Visitor", 100)};
+    for (const k of ["repo","sessionId","note","folderId","folder","linkId","ip","location","isp","platform","screen","ua","tz","lang"])
+      if (e[k]) entry[k] = safeLogText(e[k], k === "repo" ? 240 : 220);
+    if (e.ref){ try { entry.ref = new URL(e.ref).origin; } catch (err){ entry.ref = "direct"; } }
+    return entry;
+  }
+  function loadLoginLogs(scope = activityScope()){
     if (state.demo) return state.demoLogins || [];
-    try {
-      const a = JSON.parse(localStorage.getItem(LOGIN_LOG_KEY) || "[]");
-      return Array.isArray(a) ? a : [];
-    } catch (e){ return []; }
+    if (!loginCache.has(scope)){
+      const local = readLocal(loginKey(scope), []);
+      loginCache.set(scope, (Array.isArray(local) ? local : []).map(cleanLogin).filter(Boolean));
+    }
+    return loginCache.get(scope).slice();
   }
-  function saveLoginLogs(list){
-    const trimmed = (Array.isArray(list) ? list : []).slice(0, 250);
-    if (state.demo){ state.demoLogins = trimmed; return; }
-    try { localStorage.setItem(LOGIN_LOG_KEY, JSON.stringify(trimmed)); } catch (e) {}
+  function saveLoginLogs(list, scope = activityScope(), archive = false){
+    const entries = mergedLogEntries((Array.isArray(list) ? list : []).map(cleanLogin).filter(Boolean));
+    if (state.demo){ state.demoLogins = entries; return; }
+    loginCache.set(scope, entries); writeLocal(loginKey(scope), entries);
+    if (archive) logStore.importEntries(scope, "login", entries).then(checkLogStorage).catch(() => {});
   }
-  async function collectVisitorTelemetry(){
+  async function hydrateActivityLogs(scope = activityScope()){
+    if (state.demo) return;
+    if (hydratedLogScopes.has(scope)) return hydratedLogScopes.get(scope);
+    const promise = (async () => {
+      await logStore.ready;
+      const [archivedAudit, archivedLogins] = await Promise.all([logStore.entries(scope, "audit"), logStore.entries(scope, "login")]);
+      let legacyLogins = [];
+      // Old login history had no repository scope. Migrate it once on the owner
+      // connection only; never reveal a device's owner logs to an incoming link.
+      if (!shareMode && cfg.owner && cfg.repo && !readLocal("visuals-login-scope-migrated-v1", false)){
+        const legacy = readLocal(LOGIN_LOG_KEY, []);
+        if (Array.isArray(legacy)) legacyLogins = legacy.filter((e) => e && e.id && e.t);
+        writeLocal("visuals-login-scope-migrated-v1", true);
+      }
+      saveAuditLocal(mergedLogEntries(loadAudit(scope), archivedAudit.map(cleanAudit).filter(Boolean)), scope);
+      saveLoginLogs(mergedLogEntries(loadLoginLogs(scope), archivedLogins, legacyLogins), scope);
+      await Promise.all([logStore.importEntries(scope, "audit", loadAudit(scope)), logStore.importEntries(scope, "login", loadLoginLogs(scope))]);
+      checkLogStorage();
+      webhookDispatcher.schedule();
+    })();
+    hydratedLogScopes.set(scope, promise);
+    return promise;
+  }
+  let storageWarningShown = false;
+  function checkLogStorage(){
+    if (logStore.storageError && !storageWarningShown){ storageWarningShown = true; toast(logStore.storageError); }
+  }
+  async function migrateShareActivityScope(previous){
+    const scope = activityScope();
+    await hydrateActivityLogs(scope);
+    if (previous === scope) return;
+    const ownAudit = loadAudit(previous).filter((e) => e.sessionId === activitySessionId).map((e) => ({...e, repo:scope}));
+    const ownLogins = loadLoginLogs(previous).filter((e) => e.sessionId === activitySessionId).map((e) => ({...e, repo:scope}));
+    saveAuditLocal(mergedLogEntries(loadAudit(scope), ownAudit), scope, true);
+    saveLoginLogs(mergedLogEntries(loadLoginLogs(scope), ownLogins), scope, true);
+    for (const task of await logStore.outbox()) if (task.entry.sessionId === activitySessionId && task.scope === previous){
+      task.entry.repo = scope;
+      await logStore.updateTask(task.id, {scope, entry:task.entry});
+    }
+    activityScopeAliases.set(previous, scope);
+  }
+  function deviceTelemetry(){
     const nav = navigator || {};
     const info = {
-      ip: "unavailable",
-      location: "unavailable",
-      isp: "",
-      ua: String(nav.userAgent || "").slice(0, 220),
-      lang: String(nav.language || (nav.languages && nav.languages[0]) || "").slice(0, 32),
-      tz: "",
-      screen: (window.screen ? window.screen.width + "x" + window.screen.height : "") + (window.devicePixelRatio ? " @" + window.devicePixelRatio + "x" : ""),
-      platform: String(nav.userAgentData?.platform || nav.platform || "").slice(0, 48),
-      ref: document.referrer ? String(document.referrer).slice(0, 140) : "direct"
+      ip:"unavailable", location:"unavailable", isp:"",
+      ua:String(nav.userAgent || "").slice(0, 220),
+      lang:String(nav.language || nav.languages?.[0] || "").slice(0, 32), tz:"",
+      screen:(window.screen ? screen.width + "x" + screen.height : "") + (window.devicePixelRatio ? " @" + devicePixelRatio + "x" : ""),
+      platform:String(nav.userAgentData?.platform || nav.platform || "").slice(0, 48), ref:"direct"
     };
     try { info.tz = Intl.DateTimeFormat().resolvedOptions().timeZone || ""; } catch (e) {}
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 3200);
-    try {
-      const r = await fetch("https://ipapi.co/json/", {signal:ctrl.signal, cache:"no-store"});
-      if (r.ok){
-        const j = await r.json();
-        if (j && j.ip) info.ip = String(j.ip).slice(0, 64);
-        const loc = [j.city, j.region, j.country_name || j.country].filter(Boolean).join(", ");
-        if (loc) info.location = loc.slice(0, 120);
-        if (j.org) info.isp = String(j.org).slice(0, 100);
-      }
-    } catch (e){
-      try {
-        const r2 = await fetch("https://api.ipify.org?format=json", {signal:ctrl.signal, cache:"no-store"});
-        if (r2.ok){
-          const j2 = await r2.json();
-          if (j2 && j2.ip) info.ip = String(j2.ip).slice(0, 64);
-        }
-      } catch (e2) {}
-    } finally { clearTimeout(timer); }
+    // Referrers can contain credentials in queries or fragments. Keep only origin.
+    try { if (document.referrer) info.ref = new URL(document.referrer).origin; } catch (e) {}
     return info;
   }
-  async function sendWebhookLog(url, entry){
-    if (!url || !/^https:\/\//i.test(url)) return false;
-    try {
-      const summary = `[My Visuals Login] ${entry.status.toUpperCase()} · User: ${entry.user || "Anonymous"} · Mode: ${entry.mode} · Folder: ${entry.folder || entry.folderId || "App"} · IP: ${entry.ip} (${entry.location}) · Device: ${entry.platform} ${entry.screen} · Time: ${entry.iso}`;
-      const body = JSON.stringify({
-        content: summary,
-        text: summary,
-        event: "visuals_login",
-        entry
-      });
-      await request(url, {method:"POST", headers:{"Content-Type":"application/json"}, body, mode:"cors"}, () => null, {timeout:5000, silent:true}).catch(() =>
-        request(url, {method:"POST", headers:{"Content-Type":"text/plain;charset=utf-8"}, body, mode:"no-cors"}, () => null, {timeout:5000, silent:true})
-      );
-      return true;
-    } catch (e){ return false; }
+  function collectVisitorTelemetry(){
+    if (telemetryPromise) return telemetryPromise;
+    telemetryPromise = (async () => {
+      const info = deviceTelemetry(), ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 3200);
+      for (const url of ["https://ipapi.co/json/", "https://api.ipify.org?format=json"]){
+        if (ctrl.signal.aborted || info.ip !== "unavailable") break;
+        try {
+          const r = await fetch(url, {signal:ctrl.signal, cache:"no-store", credentials:"omit", referrerPolicy:"no-referrer"});
+          if (!r.ok) continue;
+          const j = await r.json();
+          if (j?.ip) info.ip = String(j.ip).slice(0, 64);
+          const loc = [j?.city, j?.region, j?.country_name || j?.country].filter(Boolean).join(", ");
+          if (loc) info.location = loc.slice(0, 120);
+          if (j?.org) info.isp = String(j.org).slice(0, 100);
+        } catch (e) {}
+      }
+      clearTimeout(timer);
+      lastTelemetry = info;
+      return info;
+    })();
+    return telemetryPromise;
   }
-  async function syncLoginEntryToRepo(entry){
-    if (!cfg.owner || !cfg.repo || (!cfg.token && !state.demo)) return false;
-    try {
-      const r = await gh("GET", "contents/login-logs.json?ref=" + enc(cfg.branch));
-      let list = [], sha = null;
-      if (r.status === 200 && r.json){
-        sha = r.json.sha;
-        const raw = r.json.content ? b64Text(r.json.content) : "";
-        const parsed = raw ? JSON.parse(raw) : [];
-        if (Array.isArray(parsed)) list = parsed;
-      } else if (r.status !== 404) return false;
-      const merged = [entry, ...list.filter((x) => x && x.id !== entry.id)].slice(0, 250);
-      const body = {message:"record login event", content:textB64(JSON.stringify(merged, null, 2)), branch:cfg.branch};
-      if (sha) body.sha = sha;
-      const put = await gh("PUT", "contents/login-logs.json", body);
-      return put.ok;
-    } catch (e){ return false; }
+  async function readRepoLog(path, repo = cfg){
+    const query = "contents/" + path + "?ref=" + enc(repo.branch);
+    const r = await gh("GET", query, undefined, repo);
+    if (r.status === 404) return {entries:[], sha:null};
+    if (!r.ok || !r.json) throw new Error("Couldn't read repository logs");
+    let raw;
+    if (r.json.content) raw = b64Text(r.json.content);
+    else raw = await request(`https://api.github.com/repos/${enc(repo.owner)}/${enc(repo.repo)}/${query}`,
+      {cache:"no-store", headers:{Accept:"application/vnd.github.raw+json", Authorization:"Bearer " + repo.token}}, async (res) => {
+        if (!res.ok) throw new Error("Couldn't read repository logs");
+        return res.text();
+      }, {silent:true});
+    const parsed = JSON.parse(raw);
+    // Never overwrite a corrupted repository log with an empty history.
+    if (!Array.isArray(parsed)) throw new Error("Repository logs must be an array");
+    return {entries:parsed, sha:r.json.sha};
   }
   async function fetchRepoLoginLogs(){
-    if (!canEdit || !cfg.owner || !cfg.repo) return false;
+    if (!canEdit || state.demo || !cfg.owner || !cfg.repo) return false;
+    const scope = activityScope(), repo = {...cfg};
     try {
-      const r = await gh("GET", "contents/login-logs.json?ref=" + enc(cfg.branch));
-      if (r.status === 200 && r.json){
-        const raw = r.json.content ? b64Text(r.json.content) : "";
-        const remote = raw ? JSON.parse(raw) : [];
-        if (Array.isArray(remote)){
-          const local = loadLoginLogs();
-          const map = new Map();
-          for (const item of [...remote, ...local]){
-            if (item && item.id && !map.has(item.id)) map.set(item.id, item);
-          }
-          const combined = [...map.values()].sort((a,b) => (b.t || 0) - (a.t || 0)).slice(0, 250);
-          saveLoginLogs(combined);
-          return true;
-        }
-      }
-    } catch (e) {}
-    return false;
+      const remote = await readRepoLog("login-logs.json", repo);
+      const combined = mergedLogEntries(loadLoginLogs(scope), remote.entries.map(cleanLogin).filter(Boolean));
+      await logStore.importEntries(scope, "login", combined);
+      if (!state.demo) saveLoginLogs(combined, scope);
+      return !!remote.sha;
+    } catch (e){ return false; }
   }
   async function recordLoginEvent({status = "success", mode = "share_link", user = "", note = "", folderId = "", folder = "", linkId = "", webhook = ""} = {}){
-    const now = Date.now();
-    const tele = await collectVisitorTelemetry();
+    const now = Date.now(), scope = activityScope();
+    // Persist immediately, before an IP lookup/network operation can lose an
+    // attempt to a closed tab, and retain its original timestamp when enriched.
     const entry = {
-      id: "lg-" + uid(),
-      t: now,
-      iso: new Date(now).toISOString(),
-      status: String(status).slice(0, 40),
-      mode: String(mode).slice(0, 40),
-      user: String(user || (mode === "device_lock" ? "Owner" : "Visitor")).slice(0, 100),
-      note: String(note || "").slice(0, 120),
-      folderId: String(folderId || shareFolderId || "").slice(0, 48),
-      folder: String(folder || (folderId && findFolder(folderId) ? folderPath(folderId) : "")).slice(0, 120),
-      linkId: String(linkId || shareLinkId || "").slice(0, 48),
-      ...tele
+      id:logId("lg-"), t:now, iso:new Date(now).toISOString(), repo:scope, sessionId:activitySessionId,
+      status:safeLogText(status, 40), mode:safeLogText(mode, 40),
+      user:safeLogText(user || (mode === "device_lock" ? "Owner" : "Visitor"), 100),
+      note:safeLogText(note, 120), folderId:safeLogText(folderId || shareFolderId || "", 120),
+      folder:safeLogText(folder || (findFolder(folderId || shareFolderId) ? folderPath(folderId || shareFolderId) : ""), 200),
+      linkId:safeLogText(linkId || shareLinkId || "", 120), ...deviceTelemetry(), ...(lastTelemetry || {})
     };
-    const list = loadLoginLogs();
-    list.unshift(entry);
-    saveLoginLogs(list);
-    lastTelemetry = {ip:entry.ip, location:entry.location, platform:entry.platform, screen:entry.screen, ua:entry.ua, tz:entry.tz, lang:entry.lang, ref:entry.ref};
-    const wh = webhook || shareWebhook || cfg.webhookUrl || "";
-    if (wh) sendWebhookLog(wh, entry);
-    if (canEdit) syncLoginEntryToRepo(entry);
-    logActivity((status === "success" ? "Login: " : "Login attempt: ") + entry.user + " · " + entry.mode.replace(/_/g, " "),
-      "security", {kind:status === "success" ? "login.success" : "login.failed", actor:entry.user, actorType:"visitor",
-        linkId:entry.linkId, folderId:entry.folderId, folder:entry.folder, note:entry.note, telemetry:{ip:entry.ip, location:entry.location, platform:entry.platform, screen:entry.screen, ua:entry.ua, tz:entry.tz, lang:entry.lang, ref:entry.ref}});
+    saveLoginLogs([entry, ...loadLoginLogs(scope)], scope);
+    const saved = state.demo ? Promise.resolve(true) : logStore.append(scope, "login", entry);
+    const auditEntry = audit(status === "success" ? "login.success" : "login.failed",
+      (status === "success" ? "Login: " : "Login attempt: ") + entry.user + " · " + mode.replace(/_/g, " "),
+      {actor:entry.user, actorType:mode === "device_lock" || mode === "security_test" ? "owner" : "visitor",
+        linkId:entry.linkId, folderId:entry.folderId, folder:entry.folder, note:entry.note, status, mode, loginId:entry.id, webhook, telemetry:entry});
     if (!$("#securitySheet").hidden) renderSecuritySheet();
+    if (!state.demo){
+      collectVisitorTelemetry().then(async (tele) => {
+        const resolvedScope = resolvedActivityScope(scope);
+        Object.assign(entry, tele, {repo:resolvedScope});
+        saveLoginLogs(mergedLogEntries([entry], loadLoginLogs(resolvedScope)), resolvedScope);
+        await logStore.append(resolvedScope, "login", entry);
+        if (auditEntry) await enrichAuditTelemetry(resolvedScope, auditEntry, tele);
+      }).catch(() => {});
+      await saved;
+      checkLogStorage();
+    }
     return entry;
   }
 
@@ -4954,137 +5102,235 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     "audit.clear":{group:"system", icon:"trash", label:"Audit cleared"},
     "queue.offline":{group:"system", icon:"activity", label:"Offline queue"},
     "queue.flush":{group:"system", icon:"check", label:"Queue synced"},
+    "share.open":{group:"login", icon:"share", label:"Link visit"},
+    "share.ready":{group:"login", icon:"unlock", label:"Folder opened"},
+    "share.error":{group:"login", icon:"lock", label:"Access error"},
+    "share.hidden":{group:"view", icon:"pause", label:"Tab hidden"},
+    "share.resume":{group:"view", icon:"play", label:"Visit resumed"},
+    "share.leave":{group:"view", icon:"back", label:"Visit ended"},
+    "view.dwell":{group:"view", icon:"activity", label:"Viewing time"},
+    "view.details":{group:"view", icon:"info", label:"File details"},
+    "view.folder":{group:"view", icon:"folder", label:"Folder visit"},
+    "view.filter":{group:"view", icon:"search", label:"Filter"},
+    "view.sort":{group:"view", icon:"info", label:"Sort order"},
+    "search.query":{group:"view", icon:"search", label:"Search"},
+    "video.play":{group:"view", icon:"play", label:"Video play"},
+    "video.pause":{group:"view", icon:"pause", label:"Video pause"},
+    "video.ended":{group:"view", icon:"video", label:"Video finished"},
+    "video.seek":{group:"view", icon:"video", label:"Video seek"},
+    "app.online":{group:"system", icon:"check", label:"Back online"},
+    "app.offline":{group:"system", icon:"activity", label:"Offline"},
+    "view.error":{group:"view", icon:"info", label:"File error"},
+    "video.error":{group:"view", icon:"video", label:"Video error"},
+    "webhook.retry":{group:"system", icon:"activity", label:"Webhook retry"},
     "app.event":{group:"system", icon:"activity", label:"Event"}
   };
   const auditMeta = (kind) => AUDIT_KINDS[kind] || {group:"system", icon:"activity", label:String(kind || "Event").replace(/[._]/g, " ")};
   const ACTIVITY_TO_AUDIT = {upload:"image.upload", edit:"image.edit", folder:"folder.edit", delete:"image.trash", backup:"backup.create", share:"share.create", security:"security.change"};
-  function auditKey(){ return AUDIT_KEY + ":" + repoKey(); }
+  function auditKey(scope = activityScope()){ return AUDIT_KEY + ":" + scope; }
+  function safeLogText(value, max = 240){
+    return String(value || "").replace(/(?:github_pat_|gh[pousr]_)[A-Za-z0-9_]+/g, "[redacted credential]")
+      .replace(/#share=[A-Za-z0-9_%=-]+/g, "#share=[redacted]").slice(0, max);
+  }
   function cleanAudit(e){
     if (!e || typeof e !== "object" || typeof e.kind !== "string" || !e.kind) return null;
     const t = Number(e.t);
-    if (!Number.isFinite(t) || t <= 0) return null;
+    if (!Number.isFinite(t) || t <= 0 || t > 8640000000000000) return null;
+    let legacyHash = 0;
+    for (const c of String(e.kind) + String(e.msg)) legacyHash = (Math.imul(legacyHash, 31) + c.charCodeAt(0)) | 0;
     const out = {
-      id: typeof e.id === "string" && e.id ? e.id.slice(0, 48) : "au-" + t + "-" + Math.random().toString(36).slice(2, 8),
-      t, kind: e.kind.slice(0, 40), msg: String(e.msg || "").slice(0, 240),
-      actor: String(e.actor || "Owner").slice(0, 80),
-      actorType: e.actorType === "visitor" ? "visitor" : "owner"
+      id:typeof e.id === "string" && e.id ? e.id.slice(0, 100) : "au-legacy-" + t + "-" + (legacyHash >>> 0).toString(36),
+      t, iso:new Date(t).toISOString(), kind:safeLogText(e.kind, 40), msg:safeLogText(e.msg),
+      actor:safeLogText(e.actor || "Owner", 100), actorType:e.actorType === "visitor" ? "visitor" : "owner"
     };
-    for (const k of ["folderId","folder","imageId","imageName","linkId","ip","location","platform","screen","ua","tz","note"])
-      if (e[k]) out[k] = String(e[k]).slice(0, 200);
-    const ms = Number(e.ms); if (Number.isFinite(ms) && ms > 0) out.ms = Math.round(ms);
-    const count = Number(e.count); if (Number.isFinite(count) && count > 0) out.count = Math.round(count);
+    for (const k of ["repo","sessionId","status","mode","loginId","folderId","folder","imageId","imageName","linkId","ip","location","isp","platform","screen","ua","tz","lang","ref","note"])
+      if (e[k]) out[k] = safeLogText(e[k], k === "repo" ? 240 : 220);
+    for (const k of ["ms","count","bytes","sequence","position"]){
+      const n = Number(e[k]); if (e[k] !== undefined && Number.isFinite(n) && n >= 0) out[k] = Math.round(n);
+    }
     return out;
   }
-  function loadAudit(){
+  function loadAudit(scope = activityScope()){
     if (state.demo) return (state.demoAudit || []).slice();
-    const a = readLocal(auditKey(), []);
-    return (Array.isArray(a) ? a : []).map(cleanAudit).filter(Boolean).slice(0, AUDIT_LIMIT);
+    if (!auditCache.has(scope)){
+      const local = readLocal(auditKey(scope), []);
+      auditCache.set(scope, (Array.isArray(local) ? local : []).map(cleanAudit).filter(Boolean));
+    }
+    return auditCache.get(scope).slice();
   }
-  function saveAuditLocal(list){
-    const trimmed = list.map(cleanAudit).filter(Boolean).slice(0, AUDIT_LIMIT);
-    if (state.demo){ state.demoAudit = trimmed; return; }
-    writeLocal(auditKey(), trimmed);
+  function saveAuditLocal(list, scope = activityScope(), archive = false){
+    const entries = mergedLogEntries(list.map(cleanAudit).filter(Boolean));
+    if (state.demo){ state.demoAudit = entries; return; }
+    auditCache.set(scope, entries);
+    // Compatibility mirror; IndexedDB retains every entry even when this larger
+    // localStorage snapshot exceeds its quota. Neither archive has a count cap.
+    writeLocal(auditKey(scope), entries);
+    if (archive) logStore.importEntries(scope, "audit", entries).then(checkLogStorage).catch(() => {});
   }
   function audit(kind, msg, extra = {}){
     try {
-      const tele = extra.telemetry || lastTelemetry || {};
+      const scope = activityScope(), tele = {...deviceTelemetry(), ...(lastTelemetry || {}), ...(extra.telemetry || {})};
       const entry = cleanAudit({
-        id:"au-" + uid(), t:Date.now(), kind, msg,
-        actor: extra.actor || (shareMode ? (shareVisitorName || "Visitor") : "Owner"),
-        actorType: extra.actorType || (shareMode ? "visitor" : "owner"),
-        folderId: extra.folderId ?? (state.folder || ""),
-        folder: extra.folder ?? (state.folder && findFolder(state.folder) ? folderPath(state.folder) : ""),
-        imageId: extra.imageId, imageName: extra.imageName, linkId: extra.linkId || shareLinkId || "",
-        note: extra.note, ms: extra.ms, count: extra.count,
-        ip: extra.ip || (tele.ip && tele.ip !== "unavailable" ? tele.ip : ""),
-        location: extra.location || (tele.location && tele.location !== "unavailable" ? tele.location : ""),
-        platform: extra.platform || tele.platform || "", screen: extra.screen || tele.screen || "",
-        ua: extra.ua || tele.ua || "", tz: extra.tz || tele.tz || ""
+        id:logId("au-"), t:Date.now(), repo:scope, sessionId:activitySessionId, sequence:++activitySequence, kind, msg,
+        actor:extra.actor || (shareMode ? shareVisitorName || "Visitor" : "Owner"),
+        actorType:extra.actorType || (shareMode ? "visitor" : "owner"),
+        folderId:extra.folderId ?? (state.folder || (shareMode ? shareScope || shareFolderId : "")),
+        folder:extra.folder ?? (findFolder(state.folder) ? folderPath(state.folder) : ""),
+        imageId:extra.imageId, imageName:extra.imageName, linkId:extra.linkId || shareLinkId || "",
+        note:extra.note, ms:extra.ms, count:extra.count, bytes:extra.bytes, position:extra.position,
+        status:extra.status || "success", mode:extra.mode || (shareMode ? "share_link" : "owner"), loginId:extra.loginId,
+        ip:extra.ip || tele.ip, location:extra.location || tele.location, isp:tele.isp,
+        platform:extra.platform || tele.platform, screen:extra.screen || tele.screen,
+        ua:extra.ua || tele.ua, tz:extra.tz || tele.tz, lang:tele.lang, ref:tele.ref
       });
       if (!entry) return null;
-      saveAuditLocal([entry, ...loadAudit().filter((e) => e.id !== entry.id)]);
-      queueAuditWebhook(entry);
+      saveAuditLocal([entry, ...loadAudit(scope)], scope);
+      if (!state.demo){
+        const url = webhookAddress(extra.webhook) || auditWebhookUrl();
+        // Deferred visitor tasks are bound only to this link's owner setting,
+        // never to a connection already saved on the recipient's device.
+        const task = url || shareMode ? {id:"wh-" + entry.id, scope, url, entry, createdAt:entry.t, nextAt:entry.t, attempts:0} : null;
+        const saved = logStore.append(scope, "audit", entry, task).then(() => { checkLogStorage(); if (task) webhookDispatcher.schedule(); });
+        pendingAuditWrites.set(entry.id, saved);
+        saved.catch(() => {}).finally(() => pendingAuditWrites.delete(entry.id));
+        if (shareMode && telemetryPromise) telemetryPromise.then((details) => enrichAuditTelemetry(scope, entry, details)).catch(() => {});
+      }
       scheduleAuditSync();
       if (!$("#auditSheet").hidden) renderAuditSheet();
       return entry;
     } catch (e){ return null; }
   }
-  // Webhook delivery is batched so a burst of views cannot flood an endpoint.
-  let auditQueue = [], auditFlushTimer = 0, auditFlushing = false;
-  function queueAuditWebhook(entry){
-    if (!auditWebhookUrl() || state.demo) return;
-    auditQueue.push(entry);
-    if (auditFlushTimer) return;
-    auditFlushTimer = setTimeout(flushAuditWebhook, 2500);
+  async function enrichAuditTelemetry(scope, entry, details){
+    scope = resolvedActivityScope(scope);
+    const enriched = cleanAudit({...entry, ...details, repo:scope});
+    saveAuditLocal(mergedLogEntries([enriched], loadAudit(scope)), scope);
+    await logStore.append(scope, "audit", enriched);
+    // Updating an existing task is atomic: a late IP response must not resurrect
+    // an entry that the dispatcher already acknowledged and removed.
+    await logStore.updateTask("wh-" + entry.id, {entry:enriched});
   }
-  async function flushAuditWebhook(){
-    auditFlushTimer = 0;
-    if (auditFlushing) return;
-    auditFlushing = true;
-    try {
-      const batch = auditQueue.splice(0, 10);
-      for (const entry of batch) await sendAuditWebhook(entry);
-    } catch (e) {}
-    finally { auditFlushing = false; if (auditQueue.length) auditFlushTimer = setTimeout(flushAuditWebhook, 2500); }
+  function auditWebhookUrl(){ return webhookAddress(shareMode ? shareWebhook : cfg.webhookUrl); }
+  function webhookPayload(task){
+    const entry = task.entry;
+    const summary = `[My Visuals] ${entry.kind} · ${entry.actorType === "visitor" ? "Visitor " + entry.actor : entry.actor} · ${entry.msg}`
+      + (entry.folder ? " · Folder: " + entry.folder : "") + (entry.linkId ? " · Link: " + entry.linkId : "")
+      + " · " + entry.iso + " · Event: " + entry.id;
+    const host = new URL(task.url).hostname.toLowerCase();
+    // Incoming provider webhooks reject arbitrary top-level properties. Keep the
+    // complete structured entry in a provider-supported message, not just a count.
+    const detail = JSON.stringify({repo:task.scope, entry});
+    if (/^(?:(?:canary|ptb)\.)?discord(?:app)?\.com$/.test(host)){
+      const message = {content:summary.slice(0, 1900), allowed_mentions:{parse:[]}};
+      // Discord caps all embed text in one message at 6,000 characters. Escaped
+      // metadata can exceed that cap; attach the complete JSON, never truncate it.
+      if (detail.length > 5700){
+        const filename = "visuals-" + entry.id.replace(/[^a-zA-Z0-9_.-]/g, "_").slice(0, 100) + ".json";
+        message.attachments = [{id:0, filename, description:"Complete activity log entry"}];
+        const form = new FormData();
+        form.append("payload_json", JSON.stringify(message));
+        form.append("files[0]", new Blob([detail], {type:"application/json"}), filename);
+        return form;
+      }
+      message.embeds = Array.from({length:Math.ceil(detail.length / 3800)}, (_, i) => ({title:"Activity log entry" + (detail.length > 3800 ? " · part " + (i + 1) : ""), description:"```json\n" + detail.slice(i * 3800, (i + 1) * 3800) + "\n```"}));
+      return message;
+    }
+    if (host === "hooks.slack.com") return {text:summary + "\n```" + detail + "```"};
+    return {schemaVersion:1, event:"visuals_audit", repo:task.scope, sessionId:entry.sessionId, content:summary, text:summary, entry};
   }
-  function auditWebhookUrl(){ return String(shareWebhook || cfg.webhookUrl || "").trim(); }
-  async function sendAuditWebhook(entry){
-    const url = auditWebhookUrl();
-    if (!url || !/^https:\/\//i.test(url)) return false;
-    try {
-      const who = entry.actorType === "visitor" ? "Visitor " + entry.actor : "Owner";
-      const summary = `[My Visuals Audit] ${auditMeta(entry.kind).label} · ${who} · ${entry.msg}`
-        + (entry.folder ? " · Folder: " + entry.folder : "")
-        + (entry.ip ? " · IP: " + entry.ip + " (" + (entry.location || "unknown") + ")" : "")
-        + " · " + new Date(entry.t).toISOString();
-      const body = JSON.stringify({content:summary, text:summary, event:"visuals_audit", entry});
-      await request(url, {method:"POST", headers:{"Content-Type":"application/json"}, body, mode:"cors"}, () => null, {timeout:5000, silent:true}).catch(() =>
-        request(url, {method:"POST", headers:{"Content-Type":"text/plain;charset=utf-8"}, body, mode:"no-cors"}, () => null, {timeout:5000, silent:true}));
-      return true;
-    } catch (e){ return false; }
+  const webhookDispatcher = logStore.createDispatcher({payload:webhookPayload, onChange:updateWebhookDeliveryStatus});
+  async function bindShareActivityWebhook(){
+    if (!shareMode || state.demo) return;
+    const scope = activityScope(), url = auditWebhookUrl();
+    if (!url) return;
+    for (const task of await logStore.outbox()){
+      if (task.url || task.entry.actorType !== "visitor") continue;
+      if (task.scope !== scope && task.entry.sessionId !== activitySessionId) continue;
+      if (task.entry.linkId !== shareLinkId) continue;
+      await logStore.updateTask(task.id, {scope, url, entry:{...task.entry, repo:scope}, nextAt:Date.now()});
+    }
+    webhookDispatcher.schedule();
   }
-  // The log lives in the data repository too, so it survives a lost device.
-  let auditSyncTimer = 0, auditSyncing = false;
+  let webhookStatusSerial = 0;
+  async function updateWebhookDeliveryStatus(){
+    const serial = ++webhookStatusSerial, scope = activityScope();
+    const pending = (await logStore.outbox()).filter((t) => t.scope === scope);
+    if (serial !== webhookStatusSerial || scope !== activityScope()) return;
+    const routed = pending.filter((t) => t.url), deferred = pending.length - routed.length;
+    const failed = routed.filter((t) => t.attempts > 0);
+    $("#secWebhookDelivery").textContent = routed.length + " pending " + (routed.length === 1 ? "delivery" : "deliveries")
+      + (deferred ? " · " + deferred + " entries waiting for the owner webhook" : "")
+      + (navigator.onLine === false ? " · offline: resumes when online" : "")
+      + (failed.length ? " · " + failed.length + " retrying: " + failed[0].lastError : "")
+      + (logStore.storageError ? " · " + logStore.storageError : "");
+    $("#secWebhookRetry").disabled = routed.length === 0 || navigator.onLine === false;
+  }
+
+  // Owner devices back up the complete history. Read-only AND upload-link
+  // receivers use the webhook only; they never overwrite repository audit files.
+  let auditSyncTimer = 0, auditSyncing = false, auditSyncVersion = 0, auditSyncedVersion = 0, auditSyncFailures = 0;
   function scheduleAuditSync(){
-    if (!repoWriter() || state.demo) return;
-    clearTimeout(auditSyncTimer);
-    auditSyncTimer = setTimeout(() => { syncAuditToRepo().catch(() => {}); }, 4000);
+    if (!canEdit || state.demo) return;
+    auditSyncVersion++;
+    if (auditSyncTimer || auditSyncing) return;
+    auditSyncTimer = setTimeout(() => { auditSyncTimer = 0; syncAuditToRepo().catch(() => {}); }, 4000);
+  }
+  async function syncRepoLog(path, type, scope, repo){
+    // A conflict is a fresh read/merge/retry, never a last-write-wins replacement.
+    for (let attempt = 0; attempt < 3; attempt++){
+      const remote = await readRepoLog(path, repo);
+      const local = type === "audit" ? loadAudit(scope) : loadLoginLogs(scope);
+      const remoteEntries = type === "audit" ? remote.entries.map(cleanAudit).filter(Boolean) : remote.entries.map(cleanLogin).filter(Boolean);
+      const merged = mergedLogEntries(local, remoteEntries);
+      const body = {message:"Update " + type + " log", branch:repo.branch, content:textB64(JSON.stringify(merged, null, 1))};
+      if (remote.sha) body.sha = remote.sha;
+      const put = await ghWrite("PUT", "contents/" + path, body, repo);
+      if (put.status === 409 || put.status === 422) continue;
+      if (!put.ok) return false;
+      // Entries made while the PUT was in flight stay in memory and in the archive.
+      const complete = mergedLogEntries(type === "audit" ? loadAudit(scope) : loadLoginLogs(scope), merged);
+      await logStore.importEntries(scope, type, complete);
+      if (!state.demo){
+        if (type === "audit") saveAuditLocal(complete, scope);
+        else saveLoginLogs(complete, scope);
+      }
+      return true;
+    }
+    return false;
   }
   async function syncAuditToRepo(){
-    if (!repoWriter() || state.demo || auditSyncing) return false;
+    if (!canEdit || state.demo || auditSyncing) return false;
+    const scope = activityScope(), repo = {...cfg}, session = repoSession, version = auditSyncVersion;
     auditSyncing = true;
+    let ok = false;
     try {
-      const r = await gh("GET", "contents/audit.json?ref=" + enc(cfg.branch));
-      let remote = [], sha = null;
-      if (r.status === 200 && r.json){
-        sha = r.json.sha;
-        try { const parsed = r.json.content ? JSON.parse(b64Text(r.json.content)) : []; if (Array.isArray(parsed)) remote = parsed; } catch (e){ remote = []; }
-      } else if (r.status !== 404) return false;
-      const map = new Map();
-      for (const e of [...loadAudit(), ...remote.map(cleanAudit).filter(Boolean)]) if (!map.has(e.id)) map.set(e.id, e);
-      const merged = [...map.values()].sort((a, b) => b.t - a.t).slice(0, AUDIT_LIMIT);
-      const body = {message:"Update audit log", branch:cfg.branch, content:textB64(JSON.stringify(merged, null, 1))};
-      if (sha) body.sha = sha;
-      const put = await ghWrite("PUT", "contents/audit.json", body);
-      if (!put.ok) return false;
-      saveAuditLocal(merged);
+      await hydrateActivityLogs(scope);
+      ok = await syncRepoLog("audit.json", "audit", scope, repo);
+      if (ok && loadLoginLogs(scope).length) ok = await syncRepoLog("login-logs.json", "login", scope, repo);
+      if (ok && session === repoSession){ auditSyncedVersion = version; auditSyncFailures = 0; }
       if (!$("#auditSheet").hidden) renderAuditSheet();
-      return true;
+      return ok;
     } catch (e){ return false; }
-    finally { auditSyncing = false; }
+    finally {
+      auditSyncing = false;
+      // A new connection may have queued logs while the old connection's write
+      // was finishing. Those new-scope logs need their own sync even without a
+      // subsequent user action; never leave the current version dirty forever.
+      if (canEdit && !state.demo && ((session === repoSession && !ok) || auditSyncedVersion < auditSyncVersion)){
+        const delay = ok || session !== repoSession ? 4000 : Math.min(60000, 4000 * 2 ** Math.min(++auditSyncFailures, 4));
+        clearTimeout(auditSyncTimer);
+        auditSyncTimer = setTimeout(() => { auditSyncTimer = 0; syncAuditToRepo().catch(() => {}); }, delay);
+      }
+    }
   }
   async function fetchRepoAudit(){
     if (!canEdit || state.demo) return false;
+    const scope = activityScope(), repo = {...cfg};
     try {
-      const r = await gh("GET", "contents/audit.json?ref=" + enc(cfg.branch));
-      if (r.status !== 200 || !r.json) return false;
-      const raw = r.json.content ? b64Text(r.json.content) : "";
-      const remote = raw ? JSON.parse(raw) : [];
-      if (!Array.isArray(remote)) return false;
-      const map = new Map();
-      for (const e of [...loadAudit(), ...remote.map(cleanAudit).filter(Boolean)]) if (!map.has(e.id)) map.set(e.id, e);
-      saveAuditLocal([...map.values()].sort((a, b) => b.t - a.t).slice(0, AUDIT_LIMIT));
-      return true;
+      const remote = await readRepoLog("audit.json", repo);
+      const combined = mergedLogEntries(loadAudit(scope), remote.entries.map(cleanAudit).filter(Boolean));
+      await logStore.importEntries(scope, "audit", combined);
+      if (!state.demo) saveAuditLocal(combined, scope);
+      return !!remote.sha;
     } catch (e){ return false; }
   }
   function auditMatches(entry, filter, q, actor){
@@ -5095,7 +5341,7 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
       .filter(Boolean).join(" ").toLowerCase();
     return q.split(/\s+/).every((t) => hay.includes(t));
   }
-  let auditClearArmed = false, auditClearTimer;
+  let auditClearArmed = false, auditClearTimer, auditRowsShown = 100;
   function renderAuditSheet(){
     const all = loadAudit();
     const q = ($("#auSearch").value || "").trim().toLowerCase();
@@ -5105,7 +5351,8 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     const current = sel.value || "all";
     sel.replaceChildren(h("option", {value:"all", text:"Everyone"}), ...actors.map((a) => h("option", {value:a, text:a})));
     sel.value = actors.includes(current) ? current : "all";
-    const rows = all.filter((e) => auditMatches(e, filter, q, sel.value));
+    const hiddenBefore = Number(readLocal("visuals-audit-view-cleared:" + activityScope(), 0)) || 0;
+    const rows = all.filter((e) => e.t > hiddenBefore && auditMatches(e, filter, q, sel.value));
     const guests = new Set(all.filter((e) => e.actorType === "visitor").map((e) => e.actor)).size;
     $("#auStats").replaceChildren(
       h("div", {class:"stat"}, h("b", {text:String(all.length)}), h("span", {text:"events on this device"})),
@@ -5114,10 +5361,11 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
       h("div", {class:"stat"}, h("b", {text:all.length ? fmtWhen(all[0].t) : "—"}), h("span", {text:"last action"}))
     );
     $("#auScope").textContent = (state.demo ? "Sample audit log" : "Audit log for " + cfg.owner + "/" + cfg.repo)
-      + " · " + all.length + " events stored on this device (latest " + AUDIT_LIMIT + "), synced to audit.json in your data repository and mirrored to your webhook when one is set.";
+      + " · " + all.length + " archived events, with no automatic count cap. Exports include the full history."
+      + (shareMode ? " Receiver logs are sent to the owner webhook when configured, not written to the repository." : " Owner logs are backed up to audit.json and mirrored to the Settings webhook.");
     const box = $("#auList"), kids = [];
     let day = "";
-    for (const e of rows.slice(0, 400)){
+    for (const e of rows.slice(0, auditRowsShown)){
       const next = activityDay(e.t);
       if (next !== day){ day = next; kids.push(h("h3", {class:"activity-day", text:day})); }
       const meta = auditMeta(e.kind);
@@ -5130,7 +5378,8 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
         e.location ? e.location : null,
         e.platform || null,
         e.screen || null,
-        e.linkId ? "Link: " + e.linkId : null
+        e.linkId ? "Link: " + e.linkId : null,
+        e.status && e.status !== "success" ? "Status: " + e.status : null
       ].filter(Boolean).join(" · ");
       kids.push(h("div", {class:"row audit-row"}, icon(meta.icon),
         h("span", {class:"nowrap-min"},
@@ -5144,25 +5393,28 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     if (!kids.length) kids.push(h("p", {class:"hint", text:all.length ? "No audit events match these filters." : "Nothing recorded yet. Every upload, edit, login, view, download, share and settings change will appear here."}));
     box.replaceChildren(...kids);
     $("#auSync").disabled = !canEdit;
-    $("#auClear").disabled = all.length === 0;
-    if (!auditClearArmed) $("#auClear").textContent = "Clear";
+    $("#auClear").disabled = rows.length === 0;
+    $("#auMore").hidden = rows.length <= auditRowsShown;
+    $("#auMore").textContent = "Show more events (" + Math.max(0, rows.length - auditRowsShown) + " remaining)";
+    $("#auShowAll").hidden = !hiddenBefore;
+    if (!auditClearArmed) $("#auClear").textContent = "Clear view";
   }
   function openAudit(){
     $("#auSearch").value = ""; $("#auFilter").value = "all";
-    auditClearArmed = false; clearTimeout(auditClearTimer);
+    auditClearArmed = false; auditRowsShown = 100; clearTimeout(auditClearTimer);
     renderAuditSheet(); openTop("#auditSheet");
   }
   function clearAudit(){
     if (!auditClearArmed){
-      auditClearArmed = true; $("#auClear").textContent = "Confirm clear";
+      auditClearArmed = true; $("#auClear").textContent = "Confirm clear view";
       auditClearTimer = setTimeout(() => { auditClearArmed = false; renderAuditSheet(); }, 5000);
       return;
     }
     clearTimeout(auditClearTimer); auditClearArmed = false;
-    saveAuditLocal([]);
+    writeLocal("visuals-audit-view-cleared:" + activityScope(), Date.now());
+    audit("audit.clear", "Cleared the audit view; all archived entries and pending deliveries are kept");
     renderAuditSheet();
-    audit("audit.clear", "Cleared the on-device audit log", {note:"repository copies are kept"});
-    toast("Audit log cleared on this device. Repository copies are kept.");
+    toast("View cleared. Full history and pending deliveries are kept; use Show full history to see them.");
   }
   function exportAudit(ext){
     const rows = loadAudit();
@@ -5170,29 +5422,32 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     let blob, name = "visuals-audit-" + stampNow() + "." + ext;
     if (ext === "json") blob = new Blob([JSON.stringify(rows, null, 2)], {type:"application/json"});
     else {
-      const cols = ["iso","kind","actor","actorType","msg","folder","imageName","linkId","ms","ip","location","platform","screen","tz","ua"];
-      const esc = (v) => '"' + String(v ?? "").replace(/"/g, '""') + '"';
+      const cols = ["id","iso","repo","sessionId","sequence","kind","status","mode","actor","actorType","msg","folderId","folder","imageId","imageName","linkId","ms","count","bytes","ip","location","platform","screen","tz","lang","ref","ua","note"];
+      const esc = csvLogValue;
       const lines = [cols.join(","), ...rows.map((r) => cols.map((c) => esc(c === "iso" ? new Date(r.t).toISOString() : r[c])).join(","))];
       blob = new Blob([lines.join("\n")], {type:"text/csv;charset=utf-8"});
       name = "visuals-audit-" + stampNow() + ".csv";
     }
     downloadBlob(blob, name);
+    audit("logs.export", "Exported " + rows.length + " audit events as " + ext.toUpperCase(), {count:rows.length});
     toast("Exported " + rows.length + " audit events.");
   }
 
   // ---------- analytics: what visitors actually look at ----------
   function computeAnalytics(){
     const events = loadAudit(), logs = loadLoginLogs();
-    const views = events.filter((e) => e.kind === "view.image");
-    const downloads = events.filter((e) => e.kind === "download.file" || e.kind === "download.zip");
-    const uploads = events.filter((e) => e.kind === "image.upload");
+    const views = events.filter((e) => e.kind === "view.image" && (!e.status || e.status === "success") && e.note !== "blocked");
+    const dwell = events.filter((e) => e.kind === "view.dwell" || (e.kind === "view.image" && e.ms));
+    const downloads = events.filter((e) => (e.kind === "download.file" || e.kind === "download.zip") && (!e.status || e.status === "success") && e.note !== "blocked");
+    const uploads = events.filter((e) => e.kind === "image.upload" && (!e.status || e.status === "success"));
     const seen = new Map();
     for (const e of views){
       const key = e.imageId || e.imageName || "unknown";
       const cur = seen.get(key) || {id:e.imageId, name:e.imageName || "File", count:0, ms:0};
-      cur.count++; cur.ms += Number(e.ms) || 0;
+      cur.count++;
       seen.set(key, cur);
     }
+    for (const e of dwell){ const cur = seen.get(e.imageId || e.imageName || "unknown"); if (cur) cur.ms += Number(e.ms) || 0; }
     const top = [...seen.values()].sort((a, b) => b.count - a.count || b.ms - a.ms).slice(0, 8);
     const perDay = [];
     for (let i = 13; i >= 0; i--){
@@ -5209,11 +5464,11 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
       cur.logins++; cur.last = Math.max(cur.last, l.t || 0); cur.users.add(l.user);
       linkStats.set(key, cur);
     }
-    return {events, logs, views, downloads, uploads, top, perDay, visitors, unique, linkStats:[...linkStats.values()].sort((a, b) => b.logins - a.logins)};
+    return {events, logs, views, dwell, downloads, uploads, top, perDay, visitors, unique, linkStats:[...linkStats.values()].sort((a, b) => b.logins - a.logins)};
   }
   function renderAnalyticsSheet(){
     const a = computeAnalytics();
-    const totalDwell = a.views.reduce((n, e) => n + (Number(e.ms) || 0), 0);
+    const totalDwell = a.dwell.reduce((n, e) => n + (Number(e.ms) || 0), 0);
     $("#anStats").replaceChildren(
       h("div", {class:"stat"}, h("b", {text:String(a.visitors.length)}), h("span", {text:"visitor logins"})),
       h("div", {class:"stat"}, h("b", {text:String(a.unique)}), h("span", {text:"unique visitors"})),
@@ -5223,7 +5478,7 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
       h("div", {class:"stat"}, h("b", {text:a.views.length ? fmtTime(Math.round(totalDwell / a.views.length / 1000)) : "—"}), h("span", {text:"average time per view"}))
     );
     $("#anScope").textContent = "Built from the audit log and login logs on this device"
-      + (canEdit ? " plus everything already committed to audit.json in " + cfg.owner + "/" + cfg.repo + ". Use “Sync from repo” in the audit log to pull entries recorded by other devices and by upload links." : ".") ;
+      + (canEdit ? " plus everything already committed to audit.json in " + cfg.owner + "/" + cfg.repo + ". Use “Sync from repo” to pull owner-device entries. Receiver entries live at your webhook endpoint." : ".") ;
     const max = Math.max(1, ...a.perDay.map((d) => d.n));
     $("#anBars").replaceChildren(...a.perDay.map((d) => h("span", {style:"height:" + Math.max(4, Math.round(d.n / max * 100)) + "%", title:d.n + " on " + d.label})));
     $("#anBarsLabels").replaceChildren(...a.perDay.map((d, i) => h("span", {text:i % 3 === 0 ? d.label : ""})));
@@ -5374,8 +5629,8 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
         ? "Using the read-only token saved in Settings for " + cfg.owner + "/" + cfg.repo + ". The same token is available to every folder."
         : "Add and confirm a separate read-only token in Settings once before sharing any folder.";
     $("#fShareWebhookStatus").textContent = cfg.webhookUrl
-      ? "Every login, view, download and upload from this link is sent to the webhook saved in Settings (" + cfg.webhookUrl.replace(/^https:\/\//, "").slice(0, 48) + "…)."
-      : "No webhook set. Add one in Settings to receive every login and action in real time; the audit log is always kept in your repository.";
+      ? "Every recorded visit and action inherits the webhook saved in Settings. Unconfirmed deliveries are kept and retried, including after reload."
+      : "No webhook set. Receiver activity stays on their device. Add one in Settings to receive every recorded visit and action remotely.";
     $("#fShareSettings").disabled = shareBusy || state.uploading || zipBusy || connecting;
     const passOk = !usePass || pass.length >= 6;
     const tokenOk = write ? !!cfg.token : !!token && !shareTokenError(token) && cfg.readTokenConfirmed;
@@ -5460,6 +5715,11 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
       dl: opts.dl !== false,
       md: opts.mode === "view" || opts.mode === "write" ? opts.mode : "dl"
     };
+    // Not a per-link override: every link inherits the one Settings endpoint.
+    // The non-secret routing snapshot also covers failed passwords/expired links
+    // before the read token can be decrypted. Never put credentials here.
+    const auditConfig = webhookAddress(cfg.webhookUrl) ? {v:1, url:webhookAddress(cfg.webhookUrl), scope:repoKey()} : null;
+    if (auditConfig) inner.audit = auditConfig;
     if (opts.scope) inner.sc = opts.scope;
     if (opts.lim) inner.lim = cleanShareLimits(opts.lim);
     if (opts.wm) inner.wm = cleanShareWatermark(opts.wm);
@@ -5475,6 +5735,7 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
         rn: opts.rn !== false,
         dl: opts.dl !== false,
         md: opts.mode === "view" || opts.mode === "write" ? opts.mode : "dl",
+        ...(auditConfig ? {audit:auditConfig} : {}),
         ...(opts.scope ? {sc:opts.scope} : {}),
         ...(opts.lim ? {lim:cleanShareLimits(opts.lim)} : {}),
         ...(opts.wm ? {wm:cleanShareWatermark(opts.wm)} : {}),
@@ -5508,7 +5769,6 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     const rn = $("#fShareRequireName").checked;
     const mode = shareModeChoice;
     const dl = mode !== "view";
-    const wh = String(cfg.webhookUrl || "").trim();
     const repo = {...cfg}, session = repoSession, controller = new AbortController(), serial = ++shareCheckSerial;
     shareCheckController = controller; shareBusy = true; clearShareOutput();
     const finish = beginLoading("Creating sharing link…"); shareBusyEnd = finish;
@@ -5660,13 +5920,17 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     $("#secLockRequireName").checked = cfg.lockRequireName !== false;
     $("#secWebhookUrl").value = cfg.webhookUrl || "";
     renderSecuritySheet();
+    updateWebhookDeliveryStatus();
     openTop("#securitySheet");
   }
+  let loginRowsShown = 80;
   function renderSecuritySheet(){
     const allLogs = loadLoginLogs();
     const q = ($("#secLogSearch").value || "").trim().toLowerCase();
     const filter = $("#secLogFilter").value || "all";
+    const hiddenBefore = Number(readLocal("visuals-login-view-cleared:" + activityScope(), 0)) || 0;
     const logs = allLogs.filter((e) => {
+      if (e.t <= hiddenBefore) return false;
       if (filter === "success" && e.status !== "success") return false;
       if (filter === "failed" && e.status === "success") return false;
       if (filter === "share" && e.mode !== "share_link") return false;
@@ -5676,6 +5940,8 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
       return q.split(/\s+/).every((t) => hay.includes(t));
     });
     const logBox = $("#secLogList");
+    $("#secLogShowAll").hidden = !hiddenBefore;
+    $("#secLogSummary").textContent = allLogs.length + " archived login records, without automatic pruning. Clear view hides entries only; exports keep the full history.";
     const hasLockedCfg = !!(cfg.locked && cfg.encryptedToken);
     $("#secLockStatus").textContent = hasLockedCfg
       ? "Active: Both GitHub tokens on this device are encrypted with AES-256-GCM and require your password on launch."
@@ -5686,7 +5952,7 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     if (!logs.length){
       logBox.replaceChildren(h("div", {class:"activity-empty", text:allLogs.length ? "No login logs match your current search/filter." : "No login attempts recorded yet. Every shared link login or device unlock will appear here with timestamp, user name, IP, location and device info."}));
     } else {
-      const rows = logs.slice(0, 80).map((e) => {
+      const rows = logs.slice(0, loginRowsShown).map((e) => {
         const ok = e.status === "success";
         const badge = h("span", {class:"sec-badge " + (ok ? "ok" : "bad"), text:ok ? "Success" : e.status.replace(/_/g, " ")});
         const modeTxt = e.mode === "device_lock" ? "App Unlock" : "Shared Link";
@@ -5712,6 +5978,8 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
       logBox.replaceChildren(...rows);
     }
 
+    $("#secLogMore").hidden = logs.length <= loginRowsShown;
+    $("#secLogMore").textContent = "Show more logins (" + Math.max(0, logs.length - loginRowsShown) + " remaining)";
     const links = state.shareLinks || [];
     const linkBox = $("#secLinksList");
     if (!links.length){
@@ -5815,21 +6083,38 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     render();
     showLoginGate("device");
   }
-  function saveWebhookConfig(){
-    const url = $("#secWebhookUrl").value.trim();
-    if (url && !/^https:\/\//i.test(url)){ secWebhookMsg("Webhook URL must start with https://", true); return; }
-    cfg.webhookUrl = url;
-    saveCfg();
-    secWebhookMsg(url ? "Webhook saved. Every login, view, download, upload and edit is sent to this endpoint." : "Webhook cleared.");
-    logActivity(url ? "Saved the fixed audit webhook in Settings" : "Cleared the audit webhook in Settings", "security", {kind:"security.change"});
+  async function saveWebhookConfig(){
+    if (!canEdit || state.demo || $("#secWebhookSave").disabled) return;
+    const raw = $("#secWebhookUrl").value.trim(), url = webhookAddress(raw);
+    if (raw && !url){ secWebhookMsg("Enter a valid HTTPS webhook URL without URL credentials or a fragment.", true); return; }
+    if (!state.loaded || state.error){ secWebhookMsg("Load your library successfully before publishing its webhook setting.", true); return; }
+    $("#secWebhookSave").disabled = true;
+    secWebhookMsg("Saving the shared activity webhook to your data repository…");
+    try {
+      cfg.webhookUrl = url;
+      state.auditWebhook = {v:1, url, updatedAt:Date.now()};
+      saveCfg(); scheduleSave();
+      const ok = await flushSave();
+      secWebhookMsg(ok ? (url ? "Webhook saved for every shared link. Every recorded receiver action is queued for this endpoint." : "Webhook cleared for future visits. Existing queued deliveries keep their original destination.")
+        : "Saved on this device, but the repository setting could not be published. Retry library sync; recipients cannot receive the update yet.", !ok);
+      audit("security.change", url ? "Saved the shared activity webhook in Settings" : "Cleared the shared activity webhook in Settings", {status:ok ? "success" : "pending"});
+      updateSharingState(); updateWebhookDeliveryStatus();
+    } finally { $("#secWebhookSave").disabled = false; }
   }
   async function testWebhookConfig(){
-    const url = $("#secWebhookUrl").value.trim() || cfg.webhookUrl;
-    if (!url || !/^https:\/\//i.test(url)){ secWebhookMsg("Enter a valid https:// webhook URL first.", true); return; }
-    secWebhookMsg("Sending test login event…");
-    const entry = await recordLoginEvent({status:"test_webhook", mode:"security_test", user:"Owner (Webhook Test)", folder:"Security Center", webhook:url});
-    audit("webhook.test", "Sent a test event to the Settings webhook", {note:url.replace(/^https:\/\//, "").slice(0, 60)});
-    secWebhookMsg("Test login event recorded and dispatched (" + entry.ip + ").");
+    if (!canEdit || state.demo || $("#secWebhookTest").disabled) return;
+    const raw = $("#secWebhookUrl").value.trim() || cfg.webhookUrl, url = webhookAddress(raw);
+    if (!url){ secWebhookMsg("Enter a valid HTTPS webhook URL first.", true); return; }
+    $("#secWebhookTest").disabled = true;
+    secWebhookMsg("Recording and sending a test activity event…");
+    try {
+      const entry = audit("webhook.test", "Test activity webhook from Settings", {webhook:url, status:"test"});
+      await pendingAuditWrites.get(entry.id);
+      await webhookDispatcher.retry(activityScope());
+      const pending = (await logStore.outbox()).find((task) => task.entry.id === entry.id);
+      secWebhookMsg(pending ? "Test recorded, but delivery is not confirmed. " + (pending.lastError || "Waiting for a connection or another delivery.") + " The entry is kept and will retry."
+        : "Test delivery confirmed by the endpoint (HTTP 2xx).", !!pending);
+    } finally { $("#secWebhookTest").disabled = false; updateWebhookDeliveryStatus(); }
   }
   function exportLoginsJson(){
     const logs = loadLoginLogs();
@@ -5842,10 +6127,14 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     toast("Exported " + logs.length + " login records as JSON.");
     audit("logs.export", "Exported " + plural(logs.length, "login record", "login records") + " as JSON", {count:logs.length});
   }
+  function csvLogValue(value){
+    const text = String(value ?? "");
+    return '"' + (/^\s*[=+@-]/.test(text) ? "'" : "") + text.replace(/"/g, '""') + '"';
+  }
   function exportLoginsCsv(){
     const logs = loadLoginLogs();
-    const cols = ["iso", "status", "mode", "user", "note", "folder", "linkId", "ip", "location", "isp", "platform", "screen", "tz", "lang", "ref", "ua"];
-    const escCsv = (v) => '"' + String(v ?? "").replace(/"/g, '""') + '"';
+    const cols = ["id", "iso", "repo", "sessionId", "status", "mode", "user", "note", "folderId", "folder", "linkId", "ip", "location", "isp", "platform", "screen", "tz", "lang", "ref", "ua"];
+    const escCsv = csvLogValue;
     const lines = [cols.join(","), ...logs.map((r) => cols.map((c) => escCsv(r[c])).join(","))];
     const blob = new Blob([lines.join("\n")], {type:"text/csv;charset=utf-8"});
     const a = document.createElement("a");
@@ -5858,10 +6147,10 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
   }
   function clearLoginLogs(){
     const n = loadLoginLogs().length;
-    saveLoginLogs([]);
+    writeLocal("visuals-login-view-cleared:" + activityScope(), Date.now());
     renderSecuritySheet();
-    audit("logs.clear", "Cleared " + plural(n, "login record", "login records") + " on this device", {count:n});
-    toast("Cleared local login history.");
+    audit("logs.clear", "Cleared the login view; all " + n + " archived login records are kept", {count:n});
+    toast("Login view cleared. Archived records and pending deliveries are kept.");
   }
 
   function loginGateMsg(text = "", bad = false){
@@ -5893,7 +6182,7 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
       $("#lgNoteRow").hidden = !reqName;
       $("#lgPassRow").hidden = !hasPass;
       $("#lgOwnerResetRow").hidden = true;
-      $("#lgNotice").textContent = "Security notice: Opening this link records your login timestamp, entered name, IP address, approximate location and device/browser details for the folder owner.";
+      $("#lgNotice").textContent = "Activity notice: Link visits, access attempts, folder/file views, viewing time, searches, downloads and uploads are logged for the owner with timestamps, your entered name and device details. IP and approximate location are included when available. Entries may be sent to the owner’s activity webhook; passwords and credentials are never logged.";
     }
     setTimeout(() => {
       if (!$("#lgVisitorRow").hidden) $("#lgVisitor").focus();
@@ -5929,25 +6218,27 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
       return;
     }
     if (shareMode){
-      if (shareRequireName && !visitor){ loginGateMsg("Please enter your name or email to continue.", true); $("#lgVisitor").focus(); return; }
-      if (shareEncrypted && !pass){ loginGateMsg("Enter the password for this shared link.", true); $("#lgPass").focus(); return; }
+      if (shareRequireName && !visitor){ recordLoginEvent({status:"missing_name", user:"Visitor", folderId:shareFolderId, linkId:shareLinkId}); loginGateMsg("Please enter your name or email to continue.", true); $("#lgVisitor").focus(); return; }
+      if (shareEncrypted && !pass){ recordLoginEvent({status:"missing_password", user:visitor || "Visitor", folderId:shareFolderId, linkId:shareLinkId}); loginGateMsg("Enter the password for this shared link.", true); $("#lgPass").focus(); return; }
       const finish = beginLoading(shareEncrypted ? "Decrypting shared link…" : "Opening shared folder…");
       btn.disabled = true; btn.textContent = "Opening shared folder…";
       try {
         if (shareEncrypted){
+          const previousScope = activityScope();
           const dec = await decryptPayload(shareEnvelope, pass);
           applySharePayload(dec);
+          await migrateShareActivityScope(previousScope);
+          await bindShareActivityWebhook();
           // The encrypted inner options are authoritative, not editable outer URL fields.
           if (shareRequireName && !visitor){
             $("#lgVisitorRow").hidden = false;
+            recordLoginEvent({status:"missing_name", user:"Visitor", folderId:shareFolderId, linkId:shareLinkId});
             loginGateMsg("Please enter your name or email to continue.", true); $("#lgVisitor").focus(); return;
           }
         }
-        shareVisitorName = visitor || "Visitor"; shareLocked = false;
+        shareVisitorName = visitor || "Visitor"; shareAccessNote = note; shareLocked = false;
         $("#loginGate").hidden = true; $("#lgPass").value = "";
         await start();
-        recordLoginEvent({status:state.error ? "link_error" : "success", mode:"share_link", user:shareVisitorName, note,
-          folderId:shareFolderId, folder:findFolder(shareFolderId)?.name || shareFolderId, linkId:shareLinkId, webhook:shareWebhook});
       } catch (err){
         recordLoginEvent({status:err.name === "OperationError" ? "failed_password" : "link_error", mode:"share_link", user:visitor || "Unknown visitor", note,
           folderId:shareFolderId, linkId:shareLinkId, webhook:shareWebhook});
@@ -6133,6 +6424,55 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     openTop("#shortcutsSheet");
   }
 
+  // ---------- receiver navigation and page lifecycle ----------
+  let searchActivityTimer = 0, lastSearchActivity = "", shareHidden = false, shareLeaveLogged = false;
+  function queueSearchActivity(){
+    if (!shareMode || shareLocked || state.error) return;
+    clearTimeout(searchActivityTimer);
+    searchActivityTimer = setTimeout(flushSearchActivity, 500);
+  }
+  function flushSearchActivity(){
+    clearTimeout(searchActivityTimer); searchActivityTimer = 0;
+    if (!shareMode || shareLocked || state.error || state.q === lastSearchActivity) return;
+    lastSearchActivity = state.q;
+    audit("search.query", state.q ? "Searched shared folder for “" + state.q + "”" : "Cleared the shared-folder search", {count:visible().length});
+  }
+  function logVisitorFilter(label, enabled){
+    if (shareMode && !shareLocked && !state.error) audit("view.filter", (enabled ? "Enabled " : "Disabled ") + label + " filter", {count:visible().length});
+  }
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden"){
+      flushSearchActivity(); flushViewerDwell("tab_hidden");
+      if (shareMode && shareEntryLogged && !shareHidden){ shareHidden = true; audit("share.hidden", "Shared-link tab moved to the background"); }
+      if (!state.demo) webhookDispatcher.flush({keepalive:true}).catch(() => {});
+    } else {
+      if (shareMode && shareHidden){ shareHidden = false; audit("share.resume", "Returned to the shared-link tab"); }
+      if (viewer.open && !viewerDwellId){ viewerDwellId = viewer.ids[viewer.idx]; viewerSince = Date.now(); }
+      if (!state.demo) webhookDispatcher.schedule();
+    }
+  });
+  window.addEventListener("pagehide", () => {
+    flushSearchActivity(); flushViewerDwell("page_exit");
+    if (shareMode && shareEntryLogged && !shareLeaveLogged){
+      shareLeaveLogged = true;
+      audit("share.leave", "Left the shared-link page", {ms:Math.max(0, Date.now() - shareSessionStarted), status:shareLocked ? "locked" : "success"});
+    }
+    if (!state.demo) webhookDispatcher.flush({keepalive:true}).catch(() => {});
+  });
+  window.addEventListener("pageshow", (e) => {
+    if (e.persisted && shareMode){ shareLeaveLogged = false; audit("share.resume", "Restored the shared-link page"); }
+    if (!state.demo) webhookDispatcher.schedule();
+  });
+  window.addEventListener("online", () => {
+    if (shareMode) audit("app.online", "Receiver device came online");
+    if (!state.demo) webhookDispatcher.schedule(0);
+    if (canEdit && auditSyncedVersion < auditSyncVersion) scheduleAuditSync();
+  });
+  window.addEventListener("offline", () => {
+    if (shareMode) audit("app.offline", "Receiver device went offline");
+    updateWebhookDeliveryStatus();
+  });
+
   // ---------- wiring ----------
   applyTheme(themeChoice());
   $("#paletteBtn").replaceChildren(icon("command"));
@@ -6154,9 +6494,12 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
   for (const id of ["#upClose", "#dClose", "#sClose", "#fClose", "#mClose", "#aClose", "#btClose", "#secClose", "#auClose", "#anClose", "#trClose", "#ksClose", "#edClose", "#coClose", "#ctClose"]) $(id).replaceChildren(icon("close"));
   for (const w of document.querySelectorAll(".selwrap")) w.append(icon("chev"));
 
-  $("#q").addEventListener("input", (e) => { state.q = e.target.value; render(); });
-  $("#sortSel").addEventListener("change", (e) => { cancelDrag(); state.reorder = false; state.sort = e.target.value; saveView(); render(); });
-  $("#folderSortSel").addEventListener("change", (e) => { state.folderSort = e.target.value; saveView(); render(); });
+  $("#q").addEventListener("input", (e) => { state.q = e.target.value; render(); queueSearchActivity(); });
+  $("#q").addEventListener("change", flushSearchActivity);
+  $("#q").addEventListener("search", flushSearchActivity);
+  $("#q").addEventListener("keydown", (e) => { if (e.key === "Enter") flushSearchActivity(); });
+  $("#sortSel").addEventListener("change", (e) => { cancelDrag(); state.reorder = false; state.sort = e.target.value; saveView(); render(); if (shareMode) audit("view.sort", "Changed file sort order to " + state.sort); });
+  $("#folderSortSel").addEventListener("change", (e) => { state.folderSort = e.target.value; saveView(); render(); if (shareMode) audit("view.sort", "Changed folder sort order to " + state.folderSort); });
   $("#reorderBtn").addEventListener("click", () => {
     if (isFiltering()) return;
     cancelDrag(); state.reorder = !state.reorder;
@@ -6186,6 +6529,12 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
   });
   $("#secWebhookSave").addEventListener("click", saveWebhookConfig);
   $("#secWebhookTest").addEventListener("click", testWebhookConfig);
+  $("#secWebhookRetry").addEventListener("click", () => { webhookDispatcher.retry(activityScope()).catch(() => {}); audit("webhook.retry", "Retried pending activity deliveries"); });
+  $("#secWebhookExport").addEventListener("click", async () => {
+    const attempts = await logStore.attempts(activityScope());
+    downloadBlob(new Blob([JSON.stringify(attempts, null, 2)], {type:"application/json"}), "visuals-webhook-deliveries-" + stampNow() + ".json");
+    audit("logs.export", "Exported webhook delivery history", {count:attempts.length});
+  });
   $("#secLogSearch").addEventListener("input", renderSecuritySheet);
   $("#secLogFilter").addEventListener("change", renderSecuritySheet);
   $("#secLogRefresh").addEventListener("click", async () => {
@@ -6196,6 +6545,8 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
   $("#secLogJson").addEventListener("click", exportLoginsJson);
   $("#secLogCsv").addEventListener("click", exportLoginsCsv);
   $("#secLogClear").addEventListener("click", clearLoginLogs);
+  $("#secLogShowAll").addEventListener("click", () => { writeLocal("visuals-login-view-cleared:" + activityScope(), 0); renderSecuritySheet(); });
+  $("#secLogMore").addEventListener("click", () => { loginRowsShown += 80; renderSecuritySheet(); });
   $("#secRevokeAll").addEventListener("click", revokeAllShareLinks);
   $("#secBackupNow").addEventListener("click", () => { closeTop(); backupAll(); });
   $("#lgForm").addEventListener("submit", handleLoginGateSubmit);
@@ -6263,7 +6614,11 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
   $("#bMove").addEventListener("click", () => openMove([...state.sel]));
   $("#bDel").addEventListener("click", bulkDelete);
   $("#upGo").addEventListener("click", doUpload);
-  for (const id of ["#upClose", "#dClose", "#sClose", "#backdrop"]) $(id).addEventListener("click", closeSheets);
+  $("#upClose").addEventListener("click", () => {
+    if (shareMode && !state.uploading) for (const pending of state.pending) audit("image.upload", "Cancelled upload of “" + baseName(pending.file.name) + "”", {imageName:baseName(pending.file.name), status:"cancelled"});
+    closeSheets();
+  });
+  for (const id of ["#dClose", "#sClose", "#backdrop"]) $(id).addEventListener("click", closeSheets);
   for (const id of ["#fClose", "#mClose", "#aClose", "#btClose", "#secClose", "#auClose", "#anClose", "#trClose", "#ksClose", "#edClose", "#coClose", "#ctClose", "#backdrop2"]) $(id).addEventListener("click", closeTop);
   const typingInField = () => {
     const el = document.activeElement;
@@ -6320,6 +6675,8 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
   $("#auFilter").addEventListener("change", renderAuditSheet);
   $("#auActor").addEventListener("change", renderAuditSheet);
   $("#auRefresh").addEventListener("click", () => { renderAuditSheet(); toast("Audit log refreshed."); });
+  $("#auMore").addEventListener("click", () => { auditRowsShown += 100; renderAuditSheet(); });
+  $("#auShowAll").addEventListener("click", () => { writeLocal("visuals-audit-view-cleared:" + activityScope(), 0); renderAuditSheet(); });
   $("#auOpenAnalytics").addEventListener("click", () => { closeTop(); openAnalytics(); });
   $("#auCsv").addEventListener("click", () => exportAudit("csv"));
   $("#auJson").addEventListener("click", () => exportAudit("json"));
@@ -6431,26 +6788,30 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     libraryLoadController = controller;
     const current = () => serial === libraryLoadSerial && session === repoSession && !controller.signal.aborted;
     const finish = beginLoading(shareMode ? "Loading shared folder…" : "Loading your library…");
-    const fail = (message) => {
+    const fail = (message, status = "link_error") => {
       state.error = message; state.items = []; state.folders = []; state.folder = null; banner(message);
+      if (shareMode){
+        audit("share.error", "Shared link access blocked: " + message, {status, folderId:shareScope || shareFolderId || ""});
+        recordLoginEvent({status, mode:"share_link", user:shareVisitorName || "Visitor", folderId:shareFolderId, linkId:shareLinkId, note:status});
+      }
     };
     state.loaded = false; state.error = null;
     try {
-      banner(""); render();
-      if (shareParseError){ fail(shareParseError); return; }
+      banner(shareMode ? "Activity notice: link visits and actions are logged for the folder owner and may be sent to their activity webhook." : ""); render();
+      await hydrateActivityLogs();
+      if (!current()) return;
+      if (shareMode && !shareEntryLogged){
+        shareEntryLogged = true;
+        collectVisitorTelemetry().catch(() => {});
+        audit("share.open", "Opened a shared link", {status:shareLocked ? "locked" : "opened", folderId:shareScope || shareFolderId || ""});
+      }
+      if (shareParseError){ fail(shareParseError, "invalid_link"); return; }
       if (shareMode && shareExpiresAt > 0 && Date.now() > shareExpiresAt){
-        $("#loginGate").hidden = true; fail("This shared link has expired. Ask the owner for a new link.");
-        recordLoginEvent({status:"expired_link", mode:"share_link", user:shareVisitorName || "Visitor", folderId:shareFolderId, linkId:shareLinkId, webhook:shareWebhook});
-        return;
+        $("#loginGate").hidden = true; fail("This shared link has expired. Ask the owner for a new link.", "expired_link"); return;
       }
       if (deviceLocked && !shareMode){ state.items = []; state.folders = []; showLoginGate("device"); return; }
       if (shareMode && shareLocked){ state.items = []; state.folders = []; showLoginGate("share"); return; }
-      if (shareMode && shareLimitHit("views")){
-        fail(shareLimitMessage("views"));
-        audit("view.image", "Blocked a visit: " + shareLimitMessage("views"), {note:"blocked"});
-        recordLoginEvent({status:"limit_reached", mode:"share_link", user:shareVisitorName || "Visitor", folderId:shareFolderId, linkId:shareLinkId, note:"views"});
-        return;
-      }
+      if (shareMode && shareLimitHit("views")){ fail(shareLimitMessage("views"), "limit_reached"); return; }
       if (!canEdit && !shareMode){ state.items = []; state.folders = []; applyRoute(); return; }
       await loadLibrary(controller.signal, current);
       if (!current()) return;
@@ -6458,43 +6819,46 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
         const linkEntry = shareLinkId ? (state.shareLinks || []).find((s) => s.id === shareLinkId) : null;
         const createdAt = linkEntry?.createdAt || shareCreatedAt;
         if (linkEntry?.revoked || (state.shareRevokedBefore && createdAt && createdAt <= state.shareRevokedBefore)){
-          fail("This shared link was revoked by the owner. Ask for a new link.");
-          recordLoginEvent({status:"revoked_link", mode:"share_link", user:shareVisitorName || "Visitor", folderId:shareFolderId, linkId:shareLinkId, webhook:shareWebhook});
-          return;
+          fail("This shared link was revoked by the owner. Ask for a new link.", "revoked_link"); return;
         }
-        if (linkEntry?.expiresAt > 0 && Date.now() > linkEntry.expiresAt){ fail("This shared link has expired. Ask the owner for a new link."); return; }
-        // The link's own payload decides what it may do; the saved record can only restrict it further.
+        if (linkEntry?.expiresAt > 0 && Date.now() > linkEntry.expiresAt){ fail("This shared link has expired. Ask the owner for a new link.", "expired_link"); return; }
+        // Saved security details can tighten, but cannot expand, a link's access.
         if (linkEntry?.mode === "view") linkMode = "view";
         if (linkEntry?.allowDl === false || linkMode === "view" || linkEntry?.mode === "view") shareAllowDl = false;
+        if (linkEntry) applyLinkLimits(linkEntry);
+        if (shareLimitHit("views")){ fail(shareLimitMessage("views"), "limit_reached"); return; }
         const root = shareRootFolder();
         const allowed = findFolder(root) ? descendants(root) : new Set();
         state.items = state.items.filter((i) => allowed.has(i.folder));
         state.folders = state.folders.filter((f) => allowed.has(f.id)).map((f) => f.id === root ? {...f, parent:null} : f);
         state.folder = findFolder(root) ? root : null;
-        if (!state.folder){ fail("This shared folder or its scoped subfolder no longer exists. Ask the owner for a new link."); return; }
-        if (linkEntry) applyLinkLimits(linkEntry);
-        bumpShareCounter("views");
-        applyWatermark();
-        applyRoute();
+        if (!state.folder){ fail("This shared folder or its scoped subfolder no longer exists. Ask the owner for a new link.", "missing_folder"); return; }
+        bumpShareCounter("views"); applyWatermark(); applyRoute();
+        audit("share.ready", "Opened shared folder “" + folderPath(state.folder) + "”", {note:linkMode});
+        audit("view.folder", "Viewed folder “" + folderPath(state.folder) + "”", {count:visible().length});
+        if (!shareAccessLogged){
+          shareAccessLogged = true;
+          recordLoginEvent({status:"success", mode:"share_link", user:shareVisitorName || "Visitor", note:shareAccessNote,
+            folderId:shareFolderId, folder:folderPath(state.folder), linkId:shareLinkId});
+        }
         banner("Shared folder" + (shareVisitorName ? " · signed in as " + shareVisitorName : "")
           + (linkMode === "view" ? " · view-only (downloads disabled)." : linkMode === "write" ? " · you can view, download and add files (no delete)." : " · view and download.")
-          + (shareWatermark ? " · watermarked." : "") + shareLimitSummary());
+          + (shareWatermark ? " · watermarked." : "") + shareLimitSummary()
+          + " · Activity notice: visits, views, searches, downloads and uploads are logged for the owner"
+          + (auditWebhookUrl() ? " and sent to their activity webhook." : "."));
       } else {
         applyRoute();
         if (state.demo) banner("Sample library · explore the features safely (including Security & Logins). Changes stay in this tab and reset on reload.");
         else if (repoWriter()){
           const queued = applyOfflineQueue();
-          if (queued){
-            setSync("error");
-            toast(plural(offlineQueued, "change", "changes") + " from an earlier offline session will be saved now.");
-            flushOfflineNow();
-          }
+          if (queued){ setSync("error"); toast(plural(offlineQueued, "change", "changes") + " from an earlier offline session will be saved now."); flushOfflineNow(); }
           autoPurgeTrash();
+          if (loadAudit().length || loadLoginLogs().length) scheduleAuditSync();
         }
       }
     } catch (e){
       if (!current()) return;
-      fail(e.name === "TypeError" ? "Couldn't reach GitHub. Check your connection and try again." : e.message || "The library couldn't be loaded. Try again.");
+      fail(e.name === "TypeError" ? "Couldn't reach GitHub. Check your connection and try again." : e.message || "The library couldn't be loaded. Try again.", "link_error");
     } finally {
       finish();
       if (serial === libraryLoadSerial && session === repoSession){
@@ -6519,6 +6883,4 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
 })();
 </script>
 </body>
-</html>
-ody>
 </html>

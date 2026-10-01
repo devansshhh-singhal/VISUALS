@@ -1,6 +1,6 @@
 const {
   test, expect, WRITE_TOKEN, READ_TOKEN, libraryFixture, sharePayload, encodeShare,
-  seedConnection, mockGitHub, openOwnerFolder, createLink
+  seedConnection, mockGitHub, openOwnerFolder, createLink, decryptShare
 } = require('./helpers.cjs');
 
 async function decodePayload(url) {
@@ -43,7 +43,8 @@ test('a write link lets a visitor upload while deletion stays impossible', async
   const payload = await decodePayload(url);
   expect(payload.md).toBe('write');
   expect(payload.lim.u).toBe(5);
-  expect(payload.t).toBe(WRITE_TOKEN);
+  expect(payload.t).toBeUndefined(); // The token is encrypted, not on the envelope.
+  expect((await decryptShare(payload, 'secret123')).t).toBe(WRITE_TOKEN);
 
   const recipient = await page.context().newPage();
   await mockGitHub(recipient, { library: api.library });
@@ -141,9 +142,12 @@ test('collections and smart folders organise files without re-uploading them', a
   await page.goto('/#f=travel');
   await page.locator('#selectBtn').click();
   await page.locator('[data-item-id="sunrise"] .open').click();
-  await page.locator('#newCollection').click();
+  await page.locator('#bCollect').click();
+  await page.locator('#ctNew').click();
   await page.locator('#coName').fill('Best of 2021');
   await page.locator('#coSave').click();
+  await page.locator('#bDone').click();
+  await page.locator('#back').click();
   await expect(page.locator('#title')).toHaveText('My Visuals');
   await expect(page.locator('[data-collection-id]')).toContainText('Best of 2021');
   await page.locator('[data-collection-id] .open').click();

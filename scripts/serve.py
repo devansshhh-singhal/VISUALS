@@ -6,7 +6,7 @@ from urllib.parse import unquote, urlsplit
 
 ROOT = Path(__file__).resolve().parent.parent
 PUBLIC_FILES = {
-    "index.html", "sw.js", "manifest.webmanifest", "apple-touch-icon.png",
+    "index.html", "activity-log.js", "sw.js", "manifest.webmanifest", "apple-touch-icon.png",
     "icon-192.png", "icon-512.png", "icon-maskable-512.png",
 }
 

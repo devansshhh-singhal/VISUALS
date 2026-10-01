@@ -1,8 +1,8 @@
 // Keeps the app installable and lets the page shell open without a connection.
 // It only touches files from this site. Requests to api.github.com (your private
 // images and library.json) never go through it, so nothing private is stored here.
-const SHELL = "visuals-shell-v3";
-const FILES = ["./", "index.html", "manifest.webmanifest", "icon-192.png", "icon-512.png"];
+const SHELL = "visuals-shell-v4";
+const FILES = ["./", "index.html", "activity-log.js", "manifest.webmanifest", "icon-192.png", "icon-512.png"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(SHELL).then((c) => c.addAll(FILES)).then(() => self.skipWaiting()));
