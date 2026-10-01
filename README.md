@@ -1,7 +1,8 @@
 # My Visuals
 
 A static, installable visual library backed by a private GitHub data repository.
-The app is in `index.html`; no runtime build or backend is required.
+The app is in `index.html`, with durable logging/webhook delivery in `activity-log.js`;
+no runtime build or application backend is required.
 
 ## Connect and share
 
@@ -23,27 +24,126 @@ The app is in `index.html`; no runtime build or backend is required.
 - **Scope, limits and watermark** are stored in the payload (`sc`, `lim`, `wm`) and in
   the saved link record. Counters live on each visitor device and are written back by
   upload links, so limits are a strong hint rather than a hard server-side guarantee.
-- The audit **webhook is configured once in Settings** and is used by every link. Older
-  links that embedded their own webhook (`wh`) are ignored on purpose: only the
-  Settings endpoint receives events.
+- The activity **webhook is configured once in Settings → Security & Logins** and
+  published as `library.json.auditWebhook`. All folders and links use that setting;
+  there is no per-folder webhook input. Legacy custom `wh` URLs are still ignored.
+- New links automatically carry a non-secret `audit` routing snapshot (`v`, `url`,
+  `scope`) in both the payload and, for encrypted links, the outer envelope. This lets
+  access attempts reach the webhook **before a password is successfully decrypted**.
+  The current repository setting is used once the library can be read. Existing links
+  without a snapshot pick up the repository setting after access; earlier attempts are
+  queued locally and sent when that same link is successfully opened.
 
-### Audit log
+### Receiver activity and audit history
 
-Every action is recorded in one place: logins and failed logins, blocked downloads,
-file views with dwell time, downloads, uploads, edits, deleted and restored files,
-folders, collections, smart folders, share links created/revoked/copied, settings and
-security changes, offline queue activity, storage checks and orphan cleanup — including
-exports of the audit log itself and clearing it. Entries carry who did it (owner or visitor),
-the folder/file/link, time, and device details (IP, location, platform, screen, time
-zone) when available.
+Every recorded action creates a separate, timestamped audit entry. Shared-link receiver
+entries include the link ID, repository, session ID, sequence, actor/name, folder/file,
+result/status and device/browser details. IP and approximate location are included when
+available; they are optional, not a reason to delay or discard an entry. Passwords,
+GitHub credentials and complete sharing URLs are never included in webhook payloads.
+Recipients see an activity notice on the login screen and shared-folder banner.
 
-- **On this device** the log lives in `localStorage` (`visuals-audit-v1:…`, 1200 entries).
-- **In the repository** it is committed to `contents/audit.json` a few seconds after the
-  last event (owner devices with a write token; visitors never write repository files).
-- **By webhook** each entry is POSTed to the endpoint from Settings in batches of ten.
-- Open it from **Settings → Audit & insight → Audit log**, filter by group or actor, and
-  export `.csv`/`.json`. **Sharing analytics** summarises views, downloads and uploads
-  per link, hour of day and top actors.
+Receiver events include:
+
+- **Each link visit**, including anonymous/passwordless visits; successful access;
+  missing name/password, incorrect passwords, invalid/expired/revoked links, missing
+  folders, GitHub load errors and exhausted visit limits.
+- **Every file open**, including sub-second views and quick reopens; separate viewing
+  durations on file changes, closing the viewer, backgrounding the tab and page exit.
+- Folder navigation, file details, completed/debounced searches, filters and sort changes;
+  video play/pause/seek/end and load/playback failures.
+- Individual and ZIP download requests, successes, failures and permission/limit denials.
+  ZIP downloads also respect the link's download count.
+- Upload starts and **per-file** successes, failures, size/type/usage-limit denials and
+  upload-dialog cancellation.
+- Background/return/page-exit events and offline/online transitions.
+
+The existing owner audit also records edits, deletions/restores, folders, collections,
+smart folders, sharing/security/settings changes, storage checks, offline saves and log
+exports. “Recent activity” is still a short convenience view; the full audit is the archive.
+
+- **Durable on-device history:** IndexedDB database `visuals-logs-v1` stores audit/login
+  entries and every webhook delivery attempt. Audit and login histories are scoped by
+  repository, migrated from existing localStorage logs, and have **no automatic count
+  cap**. A localStorage compatibility mirror and persistent emergency fallback are kept.
+  If both stores are unavailable/full, the app warns that new entries are memory-only.
+- **Repository backup:** owner devices merge the complete histories into root files
+  `audit.json` and `login-logs.json`, using fresh reads/retries on write conflicts. Large
+  log files use GitHub's authenticated raw-read fallback. Corrupted repository log JSON
+  is not silently overwritten. Read-only **and upload-link receivers never write these
+  log files**; their remote logs go to the webhook.
+- **Audit log:** Settings → Audit & insight → Audit log supports filters, paged browsing
+  and full `.csv`/`.json` exports. Security & Logins also has paged login history.
+  **Clear view only hides entries**; archived history and pending deliveries are kept.
+  Use **Show full history** to restore the view. Full library ZIP backups include the
+  audit, login and webhook-delivery histories. Existing logs that were pruned by an older
+  release cannot be reconstructed unless you have a repository/export copy.
+
+### Webhook setup and delivery guarantees
+
+1. Open **Settings → Security & Logins → Receiver Activity Webhook**.
+2. Enter a valid **HTTPS** URL without URL credentials or a fragment and select
+   **Save webhook**. The app publishes it to your data repository. If publishing fails,
+   retry library sync; the setting is not yet available to recipients.
+3. Select **Send test event**. Success is shown only after a readable **HTTP 2xx** response;
+   failures are shown as unconfirmed, not “dispatched successfully.” You can inspect
+   pending/retrying counts, **Retry pending deliveries**, and **Export delivery history**.
+4. Regenerate protected links to include the routing snapshot for pre-decryption
+   attempts. If you rotate/clear the endpoint, regenerate those links too: an older
+   encrypted envelope still has its old routing snapshot until it can read the library.
+
+Each entry is POSTed separately; the dispatcher processes at most ten entries per pass.
+Entries and their destinations are stored together in a persistent outbox **before
+sending**. An entry only leaves the queue after HTTP 2xx; network/CORS/timeouts, HTTP
+errors and 429 responses are retried with exponential backoff (up to five minutes),
+respecting `Retry-After` and throttling the entire endpoint. Queues survive reload,
+offline periods and changing between links/libraries. An existing queued entry always
+keeps its captured destination, even if Settings changes later. Delivery resumes on the
+next app visit/reconnection; page background/exit also attempts `fetch` keepalive.
+
+A custom collector receives JSON like:
+
+```json
+{
+  "schemaVersion": 1,
+  "event": "visuals_audit",
+  "repo": "owner/visuals-data@main",
+  "sessionId": "vs-example-session",
+  "entry": {
+    "id": "au-example-event",
+    "t": 1790812800000,
+    "iso": "2026-10-01T00:00:00.000Z",
+    "kind": "view.image",
+    "status": "success",
+    "actorType": "visitor",
+    "actor": "Visitor",
+    "linkId": "sl-example-link",
+    "folderId": "travel",
+    "imageId": "sunrise"
+  }
+}
+```
+
+The payload also has readable `content`/`text` summaries and additional entry metadata
+when applicable. Your collector should **persist before returning 2xx** and **deduplicate
+by `entry.id`**: delivery is **at least once**, not exactly once (for example, a server
+may save an event but its acknowledgement can be lost).
+
+Custom endpoints must support browser CORS/OPTIONS for the app origin, allowing `POST`
+and the `Content-Type` header. Expose `Retry-After` if you use it. Requests omit credentials
+and referrers and do not follow redirects. Opaque `no-cors` responses are never treated
+as confirmed delivery. Discord gets supported `content`/`embeds` fields with the complete
+structured entry and disabled mentions; oversized entries are attached as full JSON instead
+of exceeding embed limits or dropping metadata. Slack gets `text`, but direct Slack incoming
+webhooks generally need a **CORS-enabled relay** for browser delivery.
+
+**Boundary:** the webhook URL is intentionally readable by recipients, including outside
+password encryption, so use a dedicated, limited-purpose collector/webhook, **not a
+privileged API secret**. This is client-side activity reporting, not tamper-proof tracking:
+a recipient can block JavaScript/requests, clear browser storage, or close/kill a browser
+before its last writes finish. Browsers and GitHub also impose storage/file/rate limits.
+Keep server-side webhook retention and regular exports/backups for long-lived histories;
+mandatory, authoritative access auditing requires a server-side access/collection layer.
 
 ### Library tools
 
@@ -70,10 +170,13 @@ including when you update the tokens later in Settings.
 
 ### Security boundaries
 
-- Editing tokens are never included in generated sharing links.
+- View-only/download links contain only the separate read-only token. Upload links
+  intentionally contain the editing token **inside mandatory password encryption**; use
+  them only for trusted recipients and with an expiry.
 - Unencrypted links contain the read-only credential in the URL fragment; treat them as secrets. Password-protected links encrypt that credential with PBKDF2-SHA256 and AES-256-GCM.
 - GitHub tokens grant **repository-level**, not folder-level, access. Folder filtering, expiry, download controls, and per-link revocation are enforced by the app, not by GitHub. Use separate repositories for strict isolation, and revoke the token on GitHub to fully cut off API access.
-- Read-only visitors cannot write login logs to your repository. Visitor logs remain on their device unless a configured webhook receives them.
+- Receivers cannot write audit/login files through the app. Their local history and outbox
+  remain on their device; your configured webhook is the remote collection path.
 - Never commit real tokens, generated sharing links, or passwords to this repository.
 
 ## Loading and troubleshooting
@@ -114,5 +217,8 @@ plaintext and encrypted links, legacy formats, permissions, expiry/revocation, f
 timed-out requests, cancellation, repository-wide token settings, and device-lock
 encryption. `tests/features.spec.cjs` covers the audit log, the trash, the image editor
 and archived versions, collections and smart folders, share scopes/limits/watermarks,
-the storage check, and the batched grid. No real data repository is contacted or modified
-by the tests.
+the storage check, and the batched grid. `tests/activity-webhooks.spec.cjs` covers receiver
+events, pre-decryption attempts, payload redaction, persistent/offline retries, CORS and
+HTTP/429 acknowledgement semantics, destination isolation, storage fallback, uncapped
+archives/exports, conflict merges and provider payloads. No real data repository or
+webhook endpoint is contacted or modified by the tests.
