@@ -139,6 +139,18 @@ header p{margin:4px 0 0;font-size:15px}
 .sync{border:0;background:none;padding:0;font-weight:700;font-size:14px;color:var(--muted);margin-top:2px}
 .sync[data-s="error"]{color:var(--danger);text-decoration:underline}
 
+/* One visible, accessible indicator for concurrent loads, including sheets. */
+.loading-status{position:fixed;inset:0 0 auto;z-index:120;pointer-events:none;text-align:center}
+.loading-track{height:3px;overflow:hidden;background:transparent}
+.loading-track span{display:block;width:35%;height:100%;background:var(--accent);border-radius:99px;animation:loading-slide 1.3s ease-in-out infinite}
+.loading-label{display:inline-flex;align-items:center;gap:10px;max-width:calc(100% - 32px);margin:calc(12px + env(safe-area-inset-top,0px)) 16px 0;padding:10px 16px;background:var(--bg);border-radius:999px;box-shadow:var(--raise-sm);font-size:14px;font-weight:800;color:var(--accent)}
+.loading-label span:last-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.loading-spinner{display:inline-block;flex:none;width:18px;height:18px;border:2px solid var(--muted);border-top-color:var(--accent);border-radius:50%;animation:loading-spin .8s linear infinite}
+.empty .loading-spinner{width:36px;height:36px;border-width:3px}
+@keyframes loading-spin{to{transform:rotate(360deg)}}
+@keyframes loading-slide{from{transform:translateX(-110%)}to{transform:translateX(390%)}}
+@media (prefers-reduced-motion:reduce){.loading-spinner,.loading-track span{animation:none}.loading-track span{width:100%}}
+
 .banner{margin:20px 2px 0;padding:14px 18px;border-radius:18px;box-shadow:var(--inset);color:var(--muted);font-size:15px}
 
 .search{position:relative;display:block;margin:24px 2px 8px}
@@ -451,7 +463,7 @@ button[disabled]{cursor:default}
 #fShareGo .ico svg{width:18px;height:18px}
 #folderShareBtn .ico svg{width:18px;height:18px}
 #folderShareBtn{white-space:nowrap}
-#fShareConfirm:disabled,#fShareRemember:disabled{opacity:.55}
+#sReadConfirm:disabled{opacity:.55}
 
 /* Password-encrypted share links, device app lock, leak revocation & visitor login capture */
 .top-actions{display:flex;align-items:center;gap:10px;flex:none}
@@ -497,6 +509,10 @@ button[disabled]{cursor:default}
 </style>
 </head>
 <body>
+<div id="loadingStatus" class="loading-status" role="status" aria-live="polite" aria-atomic="true" hidden>
+  <div class="loading-track" aria-hidden="true"><span></span></div>
+  <div class="loading-label"><span class="loading-spinner" aria-hidden="true"></span><span id="loadingText">Loading…</span></div>
+</div>
 <main class="app">
   <header>
     <div class="top">
@@ -691,15 +707,29 @@ button[disabled]{cursor:default}
   <ol class="steps">
     <li>On GitHub, create a <b>private</b> repo for your data, e.g. <b>visuals-data</b>. Tick <b>Add a README file</b> so it isn't empty.</li>
     <li><a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">Create a token</a>. Pick <b>Only select repositories</b>, choose that private repo, and set <b>Contents</b> to <b>Read and write</b>.</li>
-    <li>Paste your details below.</li>
+    <li>For sharing, create a <b>second, fine-grained token</b> for the same data repo with <b>Contents → Read-only</b>. Save it here once for all folders.</li>
+    <li>Paste your details below. The sharing token is optional until you want to share a folder.</li>
   </ol>
   <label class="field" style="margin-top:12px"><span class="lbl">GitHub username</span>
     <input id="sOwner" type="text" autocomplete="off" autocapitalize="none" spellcheck="false"></label>
   <label class="field"><span class="lbl">Private repo name</span>
     <input id="sRepo" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="visuals-data"></label>
-  <label class="field"><span class="lbl">Token</span>
-    <input id="sToken" type="password" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="github_pat_…"></label>
-  <p class="hint">The token stays on this device only. Without it, this page shows nothing and can't upload.</p>
+  <label class="field"><span class="lbl">Read and write token · editing this device</span>
+    <span class="token-entry">
+      <input id="sToken" type="password" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="github_pat_…" aria-describedby="sTokenHelp">
+      <button id="sTokenReveal" class="btn small" type="button" aria-pressed="false" aria-label="Show read and write token">Show</button>
+    </span>
+  </label>
+  <p id="sTokenHelp" class="hint">Used for uploads and edits on this device. This token is never put in a sharing link.</p>
+  <label class="field"><span class="lbl">Read-only token · sharing all folders</span>
+    <span class="token-entry">
+      <input id="sReadToken" type="password" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="Paste a separate github_pat_… token" aria-describedby="sReadTokenHelp">
+      <button id="sReadTokenReveal" class="btn small" type="button" aria-pressed="false" aria-label="Show read-only token">Show</button>
+    </span>
+  </label>
+  <p id="sReadTokenHelp" class="hint">Create a separate <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener noreferrer">fine-grained token</a>: select only your private data repo and set <b>Contents → Read-only</b>. All folder links use this saved token, not your editing token. GitHub tokens are repository-scoped, not folder-scoped.</p>
+  <label class="check"><input id="sReadConfirm" type="checkbox">I set this separate sharing token's Contents permission to Read-only.</label>
+  <p class="hint">Both tokens are saved only on this device. A device password encrypts both saved tokens. Clear the read-only field and save to remove it; existing links still need to be revoked separately.</p>
   <div id="sMsg" class="formmsg" role="status"></div>
   <div class="actions" style="margin-top:14px">
     <button class="btn" id="sSave" type="button">Save and connect</button>
@@ -745,18 +775,10 @@ button[disabled]{cursor:default}
       <strong id="fShareFolderName"></strong>
       <span id="fShareRepo" class="hint" style="display:block;margin:6px 0 0"></span>
     </div>
-    <p id="fShareDemo" class="hint share-warning" hidden>Sample mode previews this form and lets you test encrypted links locally. Connect your real <b>visuals-data</b> repository to share with others.</p>
-    <p class="hint" style="margin:14px 0 0">Protect your shared link with a password (AES-256-GCM encryption). If the link ever gets leaked, nobody can open the folder or extract your token from the URL without the password, and every login is recorded.</p>
-    <label class="field">
-      <span class="lbl">Read-only GitHub token for this data repository</span>
-      <span class="token-entry">
-        <input id="fShareToken" type="password" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="Paste a separate github_pat_… token" aria-describedby="fShareTokenHelp">
-        <button id="fShareReveal" class="btn small" type="button" aria-pressed="false">Show</button>
-      </span>
-    </label>
-    <p id="fShareTokenHelp" class="hint">Create a <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener noreferrer">fine-grained token</a>: choose <b>Only select repositories</b>, select your data repo (for example <b>visuals-data</b>), and set <b>Repository permissions → Contents → Read-only</b>. Never use the token that connects your editing device.</p>
-    <label class="check"><input id="fShareConfirm" type="checkbox">I set this separate token's Contents permission to Read-only.</label>
-    <label class="check" style="margin-top:12px"><input id="fShareRemember" type="checkbox" checked>Reuse this sharing token for other folders in this tab only.</label>
+    <p id="fShareDemo" class="hint share-warning" hidden>Sample mode previews this form. Connect your real <b>visuals-data</b> repository to create working sharing links.</p>
+    <p class="hint" style="margin:14px 0 0">Protect your shared link with a password (AES-256-GCM encryption). Send the password separately from the link.</p>
+    <p id="fShareTokenStatus" class="hint" role="status"></p>
+    <button id="fShareSettings" class="btn small" type="button">Manage tokens in Settings</button>
 
     <label class="check" style="margin-top:18px"><input id="fShareUsePass" type="checkbox" checked>Encrypt link &amp; require a password to log in (recommended)</label>
     <div id="fSharePassFields">
@@ -792,14 +814,14 @@ button[disabled]{cursor:default}
       <span class="lbl">Login capture webhook URL (optional — Discord, Slack or custom HTTPS endpoint)</span>
       <input id="fShareWebhook" type="url" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="https://discord.com/api/webhooks/… or custom endpoint">
     </label>
-    <p class="hint">Every login attempt records visitor name, time, folder, device/OS/browser, screen, timezone, language and network info to <code>login-logs.json</code> and/or this webhook.</p>
+    <p class="hint">Login attempts are recorded on the visitor’s device. A read-only token cannot save logs to your repo; use a webhook to receive visitor logs.</p>
 
     <label class="field">
       <span class="lbl">Public address of your My Visuals app</span>
       <input id="fShareBase" type="url" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="https://yourname.github.io/my-visuals/" aria-describedby="fShareBaseHelp">
     </label>
     <p id="fShareBaseHelp" class="hint">Use the trusted address where this app is published, for example on GitHub Pages. Keep <b>visuals-data</b> private.</p>
-    <p id="fSharePrivacy" class="hint share-warning"><b>Leak protection:</b> Password protection encrypts the token inside the link so a leaked link alone cannot be decoded. You can also revoke any link below to block it in the app, or revoke the token on GitHub to cut off API access completely while keeping all data in your repository safe.</p>
+    <p id="fSharePrivacy" class="hint share-warning"><b>Leak protection:</b> A password encrypts the token inside the link. Folder filtering, expiry and download restrictions are app controls; the token itself can read the whole selected repository. Revoke a link below to block it in the app, or revoke its read-only token on GitHub to fully cut off API access. Use separate data repositories when you need strict isolation.</p>
     <div id="fShareMsg" class="formmsg" role="status"></div>
     <div class="actions" style="margin-top:12px">
       <button class="btn" id="fShareGo" type="button">Check token &amp; create link</button>
@@ -1022,6 +1044,9 @@ button[disabled]{cursor:default}
   const CACHE = "visuals-cache-v1";
   const MAX_IMG = 25 * 1024 * 1024, MAX_VID = 50 * 1024 * 1024;
   const PBKDF2_ITER = 210000;
+  const REQUEST_TIMEOUT = 20000, FILE_TIMEOUT = 90000;
+  let deviceLockKey = null, connecting = false;
+  let libraryLoadController = null, libraryLoadSerial = 0;
 
   // ---------- config & Web Crypto encryption ----------
   function detect(){
@@ -1030,29 +1055,41 @@ button[disabled]{cursor:default}
   }
   function loadCfg(){
     let saved = {};
-    try { saved = JSON.parse(localStorage.getItem(LS) || "{}"); } catch (e) {}
-    const d = detect();
+    try {
+      const parsed = JSON.parse(localStorage.getItem(LS) || "{}");
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) saved = parsed;
+    } catch (e) {}
+    const text = (value, fallback = "") => typeof value === "string" ? value : fallback;
+    const d = detect(), locked = !!(saved.locked && saved.encryptedToken);
     return {
-      owner: saved.owner || d.owner || "",
-      repo: saved.repo || "",
-      branch: saved.branch || "main",
-      token: saved.locked ? "" : (saved.token || ""),
-      locked: !!(saved.locked && saved.encryptedToken),
+      owner: text(saved.owner) || d.owner || "",
+      repo: text(saved.repo),
+      branch: text(saved.branch) || "main",
+      token: locked ? "" : text(saved.token),
+      readToken: locked ? "" : text(saved.readToken),
+      readTokenConfirmed: saved.readTokenConfirmed === true,
+      publicAppUrl: text(saved.publicAppUrl),
+      locked,
       encryptedToken: saved.encryptedToken || null,
-      requireVisitorName: saved.requireVisitorName !== false,
-      webhookUrl: saved.webhookUrl || ""
+      lockRequireName: (saved.lockRequireName ?? saved.requireVisitorName) !== false,
+      webhookUrl: text(saved.webhookUrl) || text(saved.webhook)
     };
   }
   function saveCfg(){
+    // A recipient must never overwrite the owner's saved connection, nor may sample mode.
+    if (shareMode || state.demo) return;
     try {
       const toSave = {
         owner: cfg.owner || "",
         repo: cfg.repo || "",
         branch: cfg.branch || "main",
         token: cfg.locked ? "" : (cfg.token || ""),
+        readToken: cfg.locked ? "" : (cfg.readToken || ""),
+        readTokenConfirmed: !!cfg.readTokenConfirmed,
+        publicAppUrl: cfg.publicAppUrl || "",
         locked: !!(cfg.locked && cfg.encryptedToken),
         encryptedToken: cfg.locked ? cfg.encryptedToken : null,
-        requireVisitorName: cfg.requireVisitorName !== false,
+        lockRequireName: cfg.lockRequireName !== false,
         webhookUrl: cfg.webhookUrl || ""
       };
       localStorage.setItem(LS, JSON.stringify(toSave));
@@ -1063,6 +1100,7 @@ button[disabled]{cursor:default}
   let canEdit = !!(cfg.token && cfg.owner && cfg.repo && !deviceLocked);
   let shareMode = false, shareFolderId = null, shareLocked = false, shareEnvelope = null;
   let shareAllowDl = true, shareWebhook = "", shareLinkId = "", shareCreatedAt = 0;
+  let shareEncrypted = false, shareRequireName = false, shareExpiresAt = 0, shareVisitorName = "", shareParseError = "";
 
   // A share link never touches localStorage: it's #share=<url-safe-base64 JSON> in the address itself.
   function b64url(str){ return btoa(unescape(encodeURIComponent(str))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); }
@@ -1080,49 +1118,78 @@ button[disabled]{cursor:default}
     return out;
   }
   async function deriveAesKey(password, salt, iterations = PBKDF2_ITER){
+    if (!window.crypto?.subtle) throw new Error("Password protection requires a secure HTTPS app address. Open the published app and try again.");
+    if (!Number.isInteger(iterations) || iterations < 1000 || iterations > 1000000) throw new Error("Invalid encryption settings in this link.");
     const km = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveKey"]);
     return crypto.subtle.deriveKey({name:"PBKDF2", salt, iterations, hash:"SHA-256"}, km, {name:"AES-GCM", length:256}, false, ["encrypt", "decrypt"]);
   }
-  async function encryptPayload(obj, password){
+  async function encryptPayload(obj, password, captureKey){
     const salt = crypto.getRandomValues(new Uint8Array(16));
     const iv = crypto.getRandomValues(new Uint8Array(12));
     const key = await deriveAesKey(password, salt, PBKDF2_ITER);
     const plain = new TextEncoder().encode(JSON.stringify(obj));
     const cipher = new Uint8Array(await crypto.subtle.encrypt({name:"AES-GCM", iv}, key, plain));
+    if (captureKey) captureKey(key);
     return {v:2, alg:"A256GCM", it:PBKDF2_ITER, s:bytesToB64Url(salt), iv:bytesToB64Url(iv), ct:bytesToB64Url(cipher)};
   }
-  async function decryptPayload(env, password){
+  async function decryptPayload(env, password, captureKey){
     if (!env || env.v !== 2 || !env.s || !env.iv || !env.ct) throw new Error("Invalid encrypted payload");
     const salt = b64UrlToBytes(env.s), iv = b64UrlToBytes(env.iv), ct = b64UrlToBytes(env.ct);
+    if (salt.length !== 16 || iv.length !== 12 || ct.length < 16 || ct.length > 65536) throw new Error("Invalid encrypted payload");
     const key = await deriveAesKey(password, salt, Number(env.it) || PBKDF2_ITER);
     const plainBuf = await crypto.subtle.decrypt({name:"AES-GCM", iv}, key, ct);
-    return JSON.parse(new TextDecoder().decode(new Uint8Array(plainBuf)));
+    const payload = JSON.parse(new TextDecoder().decode(new Uint8Array(plainBuf)));
+    if (captureKey) captureKey(key);
+    return payload;
   }
 
+  async function protectDeviceConfig(next){
+    if (!next.locked) return next;
+    if (!deviceLockKey || !next.encryptedToken) throw new Error("Unlock this device before changing its saved tokens.");
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const plain = new TextEncoder().encode(JSON.stringify({token:next.token, readToken:next.readToken || "", owner:next.owner, repo:next.repo, branch:next.branch}));
+    const cipher = new Uint8Array(await crypto.subtle.encrypt({name:"AES-GCM", iv}, deviceLockKey, plain));
+    return {...next, encryptedToken:{...next.encryptedToken, iv:bytesToB64Url(iv), ct:bytesToB64Url(cipher)}};
+  }
+  function validSharePayload(j){
+    return j && [j.o, j.r, j.t, j.f].every((value) => typeof value === "string" && value.trim());
+  }
+  function readShareOptions(sp){
+    shareFolderId = typeof sp.f === "string" ? sp.f : null;
+    shareRequireName = sp.rn === true || sp.rn === 1;
+    shareExpiresAt = Math.max(0, Number(sp.exp) || 0);
+    shareAllowDl = sp.dl !== false && sp.dl !== 0;
+    shareWebhook = typeof sp.wh === "string" ? sp.wh : "";
+    shareLinkId = typeof (sp.id || sp.sid) === "string" ? (sp.id || sp.sid) : "";
+    shareCreatedAt = Math.max(0, Number(sp.cat || sp.createdAt) || 0);
+  }
+  function applySharePayload(sp){
+    if (!validSharePayload(sp)) throw new Error("This sharing link is missing its repository or folder details. Ask the owner for a new link.");
+    readShareOptions(sp);
+    cfg = {owner:sp.o.trim(), repo:sp.r.trim(), branch:sp.b || "main", token:sp.t.trim(), readToken:"", locked:false, encryptedToken:null, webhookUrl:shareWebhook};
+    canEdit = false;
+  }
   function parseShare(){
-    const m = /^#share=(.+)$/.exec(location.hash);
-    if (!m) return null;
+    if (!location.hash.startsWith("#share=")) return null;
     try {
-      const j = JSON.parse(b64urlDecode(m[1]));
-      if (j && j.v === 2 && j.ct && j.iv && j.s) return {encrypted:true, envelope:j};
-      if (j && j.o && j.r && j.t && j.f) return {encrypted:false, envelope:j};
+      const j = JSON.parse(b64urlDecode(decodeURIComponent(location.hash.slice(7))));
+      if (j && j.v === 2 && [j.ct, j.iv, j.s].every((v) => typeof v === "string" && v)) return {encrypted:true, envelope:j};
+      if (validSharePayload(j)) return {encrypted:false, envelope:j};
     } catch (e) {}
-    return null;
+    return {error:"This sharing link is incomplete or invalid. Ask the owner to copy a new link."};
   }
   const shareParsed = parseShare();
   if (shareParsed){
     shareMode = true; deviceLocked = false; canEdit = false;
-    shareEnvelope = shareParsed.envelope;
-    if (shareParsed.encrypted || shareParsed.envelope.rn){
-      shareLocked = true;
-    } else {
-      const sp = shareParsed.envelope;
-      shareFolderId = sp.f;
-      shareAllowDl = sp.dl !== 0;
-      shareWebhook = sp.wh || "";
-      shareLinkId = sp.sid || "";
-      shareCreatedAt = Number(sp.cat) || 0;
-      cfg = {owner:sp.o, repo:sp.r, branch:sp.b || "main", token:sp.t, locked:false, encryptedToken:null, requireVisitorName:false, webhookUrl:sp.wh || ""};
+    // Never fall back to a connection saved on the recipient's device.
+    cfg = {owner:"", repo:"", branch:"main", token:"", readToken:"", locked:false, encryptedToken:null};
+    if (shareParsed.error) shareParseError = shareParsed.error;
+    else {
+      shareEnvelope = shareParsed.envelope;
+      shareEncrypted = shareParsed.encrypted;
+      readShareOptions(shareEnvelope);
+      if (!shareEncrypted) applySharePayload(shareEnvelope);
+      shareLocked = shareEncrypted || shareRequireName;
     }
   }
 
@@ -1140,7 +1207,7 @@ button[disabled]{cursor:default}
   const originalCfg = {...cfg};
   if (state.demo){
     deviceLocked = false; shareLocked = false;
-    cfg = {owner:"sample", repo:"sample-library", branch:"main", token:"", locked:false, encryptedToken:null, requireVisitorName:true, webhookUrl:""};
+    cfg = {owner:"sample", repo:"sample-library", branch:"main", token:"", readToken:"", locked:false, encryptedToken:null, lockRequireName:true, webhookUrl:""};
     canEdit = true;
   }
 
@@ -1162,6 +1229,49 @@ button[disabled]{cursor:default}
     s.className = "ico"; s.innerHTML = ICONS[name];
     return s;
   }
+
+  // ---------- shared loading state & bounded requests ----------
+  const loadingTasks = new Map();
+  function renderLoading(){
+    const messages = [...loadingTasks.values()];
+    $("#loadingStatus").hidden = messages.length === 0;
+    $("#loadingText").textContent = messages[messages.length - 1] || "Loading…";
+    document.querySelector(".app").setAttribute("aria-busy", String(messages.length > 0));
+  }
+  function beginLoading(message = "Loading…"){
+    const task = Symbol(); loadingTasks.set(task, message); renderLoading();
+    return () => { loadingTasks.delete(task); renderLoading(); };
+  }
+  // Keep the timeout active until the response body has been consumed as well.
+  async function request(url, options = {}, read = (r) => r.json(), {timeout = REQUEST_TIMEOUT, label = "Loading…", silent = false} = {}){
+    const controller = new AbortController(), external = options.signal;
+    const abort = () => controller.abort();
+    if (external?.aborted) controller.abort();
+    else external?.addEventListener("abort", abort, {once:true});
+    let timedOut = false;
+    const timer = setTimeout(() => { timedOut = true; controller.abort(); }, timeout);
+    const finish = silent ? () => {} : beginLoading(label);
+    try {
+      const response = await fetch(url, {...options, signal:controller.signal});
+      const value = await read(response);
+      if (controller.signal.aborted) throw new DOMException("The request was aborted.", "AbortError");
+      return value;
+    } catch (e){
+      if (timedOut) throw Object.assign(new Error("The request timed out. Check your connection and try again."), {name:"TimeoutError"});
+      if (e.name !== "AbortError" && navigator.onLine === false) throw new Error("You're offline. Reconnect to the internet and try again.");
+      throw e;
+    } finally {
+      clearTimeout(timer); external?.removeEventListener("abort", abort); finish();
+    }
+  }
+  function githubError(status){
+    const message = status === 401 ? (shareMode ? "This sharing token is invalid, expired or revoked. Ask the owner for a new link." : "GitHub rejected your token. Open Settings to reconnect.")
+      : status === 403 ? "GitHub denied access or reached its API rate limit. Check the token's Contents permission and try again."
+      : status === 404 ? "The repository, branch or shared library wasn't found. Check the link and its token's repository access."
+      : "GitHub couldn't load the library (status " + status + "). Try again.";
+    return Object.assign(new Error(message), {status});
+  }
+
   let toastTimer;
   function toast(msg){
     const t = $("#toast");
@@ -1254,10 +1364,11 @@ button[disabled]{cursor:default}
       if (urlCache.has(path)) return urlCache.get(path);
       let blob = await cacheGet(path);
       if (!blob){
-        const res = await fetch(`https://api.github.com/repos/${cfg.owner}/${cfg.repo}/contents/${path}?ref=${enc(cfg.branch)}`,
-          {headers:{"Accept":"application/vnd.github.raw+json","X-GitHub-Api-Version":"2022-11-28","Authorization":"Bearer " + cfg.token}});
-        if (!res.ok) throw new Error("status " + res.status);
-        blob = new Blob([await res.arrayBuffer()], {type: mimeOf(path)});
+        blob = await request(`https://api.github.com/repos/${enc(cfg.owner)}/${enc(cfg.repo)}/contents/${encodedPath(path)}?ref=${enc(cfg.branch)}`,
+          {headers:{"Accept":"application/vnd.github.raw+json","X-GitHub-Api-Version":"2022-11-28","Authorization":"Bearer " + cfg.token}}, async (res) => {
+            if (!res.ok) throw githubError(res.status);
+            return new Blob([await res.arrayBuffer()], {type:mimeOf(path)});
+          }, {timeout:FILE_TIMEOUT, label:"Loading images…"});
         cachePut(path, blob);
       }
       const url = URL.createObjectURL(blob);
@@ -1290,21 +1401,22 @@ button[disabled]{cursor:default}
     if (hit){ videoUrls.delete(path); videoUrls.set(path, hit); return Promise.resolve(hit); }
     if (videoJobs.has(path)) return videoJobs.get(path);
     const job = (async () => {
-      const res = await fetch(`https://api.github.com/repos/${cfg.owner}/${cfg.repo}/contents/${path}?ref=${enc(cfg.branch)}`,
-        {headers:{"Accept":"application/vnd.github.raw+json","X-GitHub-Api-Version":"2022-11-28","Authorization":"Bearer " + cfg.token}});
-      if (!res.ok) throw new Error("status " + res.status);
-      let blob;
-      if (res.body && res.body.getReader){
-        const total = Number(res.headers.get("content-length")) || it.size || 0;
-        const reader = res.body.getReader(), parts = []; let got = 0;
-        for (;;){
-          const {done, value} = await reader.read();
-          if (done) break;
-          parts.push(value); got += value.length;
-          if (total && onProgress) onProgress(Math.min(1, got / total));
-        }
-        blob = new Blob(parts, {type: mimeOf(path)});
-      } else blob = new Blob([await res.arrayBuffer()], {type: mimeOf(path)});
+      const blob = await request(`https://api.github.com/repos/${enc(cfg.owner)}/${enc(cfg.repo)}/contents/${encodedPath(path)}?ref=${enc(cfg.branch)}`,
+        {headers:{"Accept":"application/vnd.github.raw+json","X-GitHub-Api-Version":"2022-11-28","Authorization":"Bearer " + cfg.token}}, async (res) => {
+          if (!res.ok) throw githubError(res.status);
+          if (res.body && res.body.getReader){
+            const total = Number(res.headers.get("content-length")) || it.size || 0;
+            const reader = res.body.getReader(), parts = []; let got = 0;
+            for (;;){
+              const {done, value} = await reader.read();
+              if (done) break;
+              parts.push(value); got += value.length;
+              if (total && onProgress) onProgress(Math.min(1, got / total));
+            }
+            return new Blob(parts, {type:mimeOf(path)});
+          }
+          return new Blob([await res.arrayBuffer()], {type:mimeOf(path)});
+        }, {timeout:FILE_TIMEOUT, label:"Loading video…"});
       const url = URL.createObjectURL(blob);
       rememberVideo(path, url);
       return url;
@@ -1360,14 +1472,16 @@ button[disabled]{cursor:default}
   }
 
   // ---------- GitHub API ----------
-  async function gh(method, path, body){
+  async function gh(method, path, body, repo = cfg, signal){
     if (state.demo) return demoGh(method, path, body);
-    const url = `https://api.github.com/repos/${cfg.owner}/${cfg.repo}` + (path ? "/" + path : "");
-    const headers = {"Accept":"application/vnd.github+json","X-GitHub-Api-Version":"2022-11-28","Authorization":"Bearer " + cfg.token};
+    const url = `https://api.github.com/repos/${enc(repo.owner)}/${enc(repo.repo)}` + (path ? "/" + path : "");
+    const headers = {"Accept":"application/vnd.github+json","X-GitHub-Api-Version":"2022-11-28","Authorization":"Bearer " + repo.token};
     if (body) headers["Content-Type"] = "application/json";
-    const res = await fetch(url, {method, headers, cache:"no-store", body: body ? JSON.stringify(body) : undefined});
-    let json = null; try { json = await res.json(); } catch (e) {}
-    return {ok: res.ok, status: res.status, json, headers: res.headers};
+    return request(url, {method, headers, signal, cache:"no-store", body:body ? JSON.stringify(body) : undefined}, async (res) => {
+      let json = null;
+      try { json = await res.json(); } catch (e){ if (e.name !== "SyntaxError") throw e; }
+      return {ok:res.ok, status:res.status, json, headers:res.headers};
+    }, {timeout:method === "GET" ? REQUEST_TIMEOUT : FILE_TIMEOUT, label:method === "GET" ? "Loading from GitHub…" : "Saving to GitHub…"});
   }
   // Writes wait and retry when GitHub says "slow down", instead of failing the whole batch.
   async function ghWrite(method, path, body){
@@ -1386,7 +1500,7 @@ button[disabled]{cursor:default}
   const cleanFolder = (f) => ({id:f.id, name:f.name, parent:f.parent || null, createdAt:f.createdAt || 0});
   const cleanShareLink = (s) => ({id:s.id, folderId:s.folderId, folderName:s.folderName || "", createdAt:Number(s.createdAt) || 0,
     expiresAt:s.expiresAt ? Number(s.expiresAt) : null, requireName:s.requireName !== false, allowDl:s.allowDl !== false,
-    passwordProtected:!!s.passwordProtected, revoked:!!s.revoked});
+    passwordProtected:!!(s.passwordProtected ?? s.hasPassword), revoked:!!s.revoked});
   function librarySnapshot(){
     return {
       version:3,
@@ -1440,22 +1554,26 @@ button[disabled]{cursor:default}
     return {folders, items, shareLinks, shareRevokedBefore};
   }
 
-  async function fetchLibrary(){
-    const r = await gh("GET", "contents/library.json?ref=" + enc(cfg.branch));
-    if (r.status === 404) return {sha:null, data:{}};
-    if (!r.ok) throw {status: r.status};
+  async function fetchLibrary(signal){
+    const repo = {...cfg}, path = "contents/library.json?ref=" + enc(repo.branch);
+    const r = await gh("GET", path, undefined, repo, signal);
+    if (r.status === 404 && !shareMode) return {sha:null, data:{}};
+    if (!r.ok) throw githubError(r.status);
+    if (!r.json) throw new Error("GitHub returned empty library metadata. Try again.");
     let text;
     if (r.json.content) text = b64Text(r.json.content);
-    else {
-      const raw = await fetch(`https://api.github.com/repos/${cfg.owner}/${cfg.repo}/contents/library.json?ref=${enc(cfg.branch)}`,
-        {headers:{"Accept":"application/vnd.github.raw+json","Authorization":"Bearer " + cfg.token}});
-      text = await raw.text();
-    }
-    return {sha:r.json.sha, data:JSON.parse(text)};
+    else text = await request(`https://api.github.com/repos/${enc(repo.owner)}/${enc(repo.repo)}/${path}`,
+      {signal, cache:"no-store", headers:{"Accept":"application/vnd.github.raw+json","X-GitHub-Api-Version":"2022-11-28","Authorization":"Bearer " + repo.token}}, async (raw) => {
+        if (!raw.ok) throw githubError(raw.status);
+        return raw.text();
+      }, {label:"Loading library metadata…"});
+    try { return {sha:r.json.sha, data:JSON.parse(text)}; }
+    catch (e){ throw new Error("The saved library metadata is invalid. Ask the owner to check library.json."); }
   }
-  async function loadLibrary(){
+  async function loadLibrary(signal, isCurrent = () => true){
     if (state.demo){ seedDemo(); return; }
-    const {sha, data} = await fetchLibrary();
+    const {sha, data} = await fetchLibrary(signal);
+    if (!isCurrent()) return;
     const n = norm(data);
     state.sha = sha; state.items = n.items; state.folders = n.folders;
     state.shareLinks = n.shareLinks; state.shareRevokedBefore = n.shareRevokedBefore;
@@ -1512,7 +1630,7 @@ button[disabled]{cursor:default}
     clearTimeout(saveTimer);
     if (!canEdit) return Promise.resolve(false);
     if (savingPromise) return savingPromise;
-    const session = repoSession;
+    const session = repoSession, finish = beginLoading("Saving library changes…");
     saving = true;
     savingPromise = (async () => {
       let ok = true;
@@ -1532,7 +1650,7 @@ button[disabled]{cursor:default}
       }
       if (session === repoSession) setSync(ok ? "saved" : "error");
       return ok;
-    })().finally(() => { saving = false; savingPromise = null; renderZipState(); });
+    })().finally(() => { finish(); saving = false; savingPromise = null; renderZipState(); });
     renderZipState();
     return savingPromise;
   }
@@ -1634,7 +1752,19 @@ button[disabled]{cursor:default}
     state.folder = id; readView(); render(); window.scrollTo(0, 0);
   }
 
+  // Fragment-only navigation does not rerun this script. Reload when entering,
+  // changing or leaving a share link so the new credentials are parsed safely.
+  const activeShareHash = shareMode ? location.hash : "";
+  let shareNavigationReloading = false;
+  function reloadChangedShare(){
+    const next = location.hash.startsWith("#share=") ? location.hash : "";
+    if (next === activeShareHash) return false;
+    if (!shareNavigationReloading){ shareNavigationReloading = true; location.reload(); }
+    return true;
+  }
+  window.addEventListener("hashchange", reloadChangedShare);
   window.addEventListener("popstate", () => {
+    if (reloadChangedShare()) return;
     if (viewer.open){ hideViewer(); return; }
     applyRoute(); render();
   });
@@ -1679,8 +1809,10 @@ button[disabled]{cursor:default}
     $("#title").textContent = f ? f.name : "My Visuals";
     document.title = (f ? f.name + " – " : "") + "My Visuals";
     let text;
-    if (!state.loaded) text = "Loading your library…";
-    else if (state.error) text = "Couldn't load your library";
+    if (!state.loaded) text = shareMode ? "Loading shared folder…" : "Loading your library…";
+    else if (state.error) text = shareMode ? "Couldn't open this shared folder" : "Couldn't load your library";
+    else if (shareMode && shareLocked) text = "Sign in to open the shared folder";
+    else if (deviceLocked) text = "Unlock your library to continue";
     else if (f){
       const own = state.items.filter((i) => i.folder === f.id), children = childFolders(f.id);
       const parts = [];
@@ -1805,11 +1937,12 @@ button[disabled]{cursor:default}
     }
     $("#sortWrap").hidden = true;
     if (!state.loaded){
-      empty.replaceChildren(icon("image"), h("h2", {text:"Loading"}), h("p", {text:"Getting your images ready."}));
+      empty.replaceChildren(h("span", {class:"loading-spinner", "aria-hidden":"true"}), h("h2", {text:"Loading"}), h("p", {text:"Getting your images ready."}));
     } else if (state.error){
-      empty.replaceChildren(icon("image"), h("h2", {text:"Library unavailable"}),
-        h("p", {text:"Check your connection or reconnect in settings."}),
-        h("div", {class:"emptyrow"}, h("button", {class:"btn", type:"button", text:"Open settings", onclick:openSettings})));
+      empty.replaceChildren(icon("image"), h("h2", {text:shareMode ? "Shared folder unavailable" : "Library unavailable"}),
+        h("p", {text:typeof state.error === "string" ? state.error : "Check your connection and try again."}),
+        h("div", {class:"emptyrow"}, h("button", {class:"btn", type:"button", text:"Try again", onclick:start}),
+          !shareMode ? h("button", {class:"btn", type:"button", text:"Open settings", onclick:openSettings}) : null));
     } else if (!canEdit && !shareMode){
       empty.replaceChildren(icon("image"), h("h2", {text:"Connect your library"}), h("p", {text:"Link your private repo to see and add images."}),
         h("div", {class:"emptyrow"}, h("button", {class:"btn", type:"button", text:"Connect", onclick:openSettings}),
@@ -1832,7 +1965,7 @@ button[disabled]{cursor:default}
     }
   }
   function renderDock(){
-    $("#dock").hidden = !canEdit || state.reorder;
+    $("#dock").hidden = !canEdit || !state.loaded || !!state.error || state.reorder;
     $("#addBtn").hidden = state.select;
     $("#selBar").hidden = !state.select;
     const none = state.sel.size === 0;
@@ -1935,13 +2068,11 @@ button[disabled]{cursor:default}
     resetFolderDelete(); openTop("#folderSheet"); $("#folderSheet").scrollTop = 0; renderZipState();
     setTimeout(() => {
       if ($("#folderSheet").hidden) return;
-      const input = shareOnly ? $("#fShareToken") : $("#fName");
+      const input = shareOnly ? (cfg.readToken ? $("#fSharePass") : $("#fShareSettings")) : $("#fName");
       if (!input.disabled) input.focus({preventScroll:true});
       if (edit && !shareOnly) input.select();
     }, 30);
   }
-
-  const shareTokenDraft = new Map(); // explicit reuse only, never persisted; keyed by repo/branch
 
   // ---------- complete library and recursive folder ZIP exports ----------
   let zipBusy = false, zipMessage = "";
@@ -1956,8 +2087,8 @@ button[disabled]{cursor:default}
     $("#sBackup").textContent = zipBusy ? "Preparing backup…" : "Download full backup (.zip)";
     $("#shareZipBtn").replaceChildren(icon("download"), zipBusy ? "Preparing .zip…" : "Download folder as .zip");
     for (const id of ["#backupStatus", "#sBackupStatus", "#fZipStatus"]){ $(id).hidden = !zipMessage; $(id).textContent = zipMessage; }
-    $("#sOut").disabled = zipBusy || state.uploading || saving;
-    $("#sSave").disabled = zipBusy || state.uploading || saving;
+    $("#sOut").disabled = zipBusy || state.uploading || saving || connecting;
+    $("#sSave").disabled = zipBusy || state.uploading || saving || connecting;
     updateSharingState();
   }
   function setZipStatus(msg){ zipMessage = msg; renderZipState(); }
@@ -1970,9 +2101,10 @@ button[disabled]{cursor:default}
     }
     for (let attempt = 0; attempt < 3; attempt++){
       if (signal?.aborted) throw new Error("Download cancelled");
-      const r = await fetch(`https://api.github.com/repos/${cfg.owner}/${cfg.repo}/contents/${encodedPath(path)}?ref=${enc(cfg.branch)}`,
-        {headers:{"Accept":"application/vnd.github.raw+json", "X-GitHub-Api-Version":"2022-11-28", "Authorization":"Bearer " + cfg.token}, signal});
-      if (r.ok) return r.arrayBuffer();
+      const {r, bytes} = await request(`https://api.github.com/repos/${enc(cfg.owner)}/${enc(cfg.repo)}/contents/${encodedPath(path)}?ref=${enc(cfg.branch)}`,
+        {headers:{"Accept":"application/vnd.github.raw+json", "X-GitHub-Api-Version":"2022-11-28", "Authorization":"Bearer " + cfg.token}, signal}, async (r) => ({r, bytes:r.ok ? await r.arrayBuffer() : null}),
+        {timeout:FILE_TIMEOUT, label:"Downloading library files…"});
+      if (r.ok) return bytes;
       if ((r.status === 429 || r.status >= 500) && attempt < 2){
         const retry = Number(r.headers.get("retry-after")) || (attempt + 1);
         await sleep(Math.min(10, retry) * 1000); continue;
@@ -1998,6 +2130,7 @@ button[disabled]{cursor:default}
     if (state.uploading){ toast("Finish uploading before making a backup."); return; }
     if ((!canEdit && !shareMode) || !state.loaded || state.error) return;
     if (typeof JSZip === "undefined"){ toast("The bundled ZIP tool is unavailable."); return; }
+    const finish = beginLoading(full ? "Preparing library backup…" : "Preparing folder download…");
     zipBusy = true; setZipStatus("Preparing a complete snapshot…");
     const controller = new AbortController();
     try {
@@ -2076,7 +2209,7 @@ button[disabled]{cursor:default}
       controller.abort();
       const msg = "Backup stopped: " + (e.message || "download failed") + ". No incomplete ZIP was downloaded.";
       setZipStatus(msg); toast(msg);
-    } finally { zipBusy = false; renderZipState(); }
+    } finally { finish(); zipBusy = false; renderZipState(); }
   }
   function zipFolder(folderId){ return runZip(false, folderId); }
   function backupAll(){ return runZip(true, null); }
@@ -2439,6 +2572,7 @@ button[disabled]{cursor:default}
     const doShrink = $("#upShrink").checked;
     const list = state.pending.slice();
     const n = list.length;
+    const finish = beginLoading("Uploading files…");
     state.uploading = true; $("#upGo").disabled = true; $("#upClose").disabled = true;
     const added = []; let order = nextOrder(folder); let failed = 0, tooBig = 0, slow = 0, fatal = null;
     for (let i = 0; i < n; i++){
@@ -2466,7 +2600,7 @@ button[disabled]{cursor:default}
         added.push({id, file:name, name:baseName(file.name), tags, fav:false, folder, order:order++, thumbSize:thumb && t ? t.blob.size : 0, createdAt:Date.now() + (n - i), size:blob.size, type, sha:r.json.content.sha, thumb, dur, _url:URL.createObjectURL(blob), _turl: t ? URL.createObjectURL(t.blob) : undefined});
       } catch (e) { failed++; }
     }
-    state.uploading = false; $("#upClose").disabled = false;
+    finish(); state.uploading = false; $("#upClose").disabled = false;
     if (added.length){
       state.items = [...added, ...state.items];
       closeSheets(); render();
@@ -2678,53 +2812,77 @@ button[disabled]{cursor:default}
   $("#vNext").replaceChildren(icon("next"));
 
   // ---------- settings ----------
+  function resetTokenReveal(inputId, buttonId, label){
+    $(inputId).type = "password"; $(buttonId).textContent = "Show";
+    $(buttonId).setAttribute("aria-pressed", "false"); $(buttonId).setAttribute("aria-label", "Show " + label);
+  }
   function openSettings(){
+    if (shareMode) return;
     $("#sTitle").textContent = canEdit ? "Library settings" : "Connect your library";
     $("#sConnectionFields").hidden = state.demo;
     $("#sDemoHelp").hidden = !state.demo;
     $("#sStorageTarget").value = storageTarget() / 1048576;
     $("#storageMsg").textContent = "";
-    $("#sOwner").value = cfg.owner; $("#sRepo").value = cfg.repo || "visuals-data"; $("#sToken").value = "";
-    $("#sToken").placeholder = (cfg.token || cfg.locked) ? "Connected. Paste a new token to replace it" : "github_pat_…";
+    $("#sOwner").value = cfg.owner; $("#sRepo").value = cfg.repo || "visuals-data";
+    $("#sToken").value = cfg.token || ""; $("#sReadToken").value = cfg.readToken || "";
+    $("#sReadConfirm").checked = !!(cfg.readToken && cfg.readTokenConfirmed);
+    resetTokenReveal("#sToken", "#sTokenReveal", "read and write token");
+    resetTokenReveal("#sReadToken", "#sReadTokenReveal", "read-only token");
+    $("#sToken").placeholder = cfg.locked ? "Unlock this device to manage tokens" : "github_pat_…";
     $("#sOut").hidden = !cfg.token && !cfg.locked;
     const st = $("#sStatus");
     st.hidden = !canEdit; st.textContent = state.demo ? "Sample library · no GitHub connection" : canEdit ? "Connected to " + cfg.owner + "/" + cfg.repo : "";
-    $("#sMsg").textContent = ""; $("#sMsg").className = "formmsg";
-    $("#sConnectedActions").hidden = !canEdit;
+    sMsg(""); $("#sConnectedActions").hidden = !canEdit;
     if (canEdit) refreshStorage(); else $("#storageBox").hidden = true;
     showSheet("#settings");
   }
   function sMsg(t, bad){ const m = $("#sMsg"); m.textContent = t; m.className = "formmsg" + (bad ? " bad" : ""); }
   async function connect(){
+    if (connecting || shareMode || deviceLocked || state.demo || zipBusy || state.uploading || saving) return;
     const owner = $("#sOwner").value.trim(), repo = $("#sRepo").value.trim();
-    const token = $("#sToken").value.trim() || cfg.token;
-    if (!owner || !repo || !token){ sMsg("Fill in your username, repository and token.", true); return; }
-    const prev = cfg;
-    cfg = Object.assign({}, cfg, {owner, repo, token});
-    $("#sSave").disabled = true; sMsg("Checking…");
+    const token = $("#sToken").value.trim(), readToken = $("#sReadToken").value.trim();
+    if (!owner || !repo || !token){ sMsg("Fill in your username, repository and read and write token.", true); return; }
+    const tokenError = shareTokenError(readToken, token);
+    if (tokenError){ sMsg(tokenError, true); return; }
+    if (readToken && !$("#sReadConfirm").checked){ sMsg("Confirm that the separate sharing token has Contents set to Read-only.", true); return; }
+    let next = {...cfg, owner, repo, token, readToken, readTokenConfirmed:!!readToken && $("#sReadConfirm").checked};
+    const changedRepo = owner.toLowerCase() !== cfg.owner.toLowerCase() || repo.toLowerCase() !== cfg.repo.toLowerCase();
+    if (changedRepo) next.publicAppUrl = "";
+    connecting = true; renderZipState(); sMsg("Checking your repository and tokens…");
+    const finish = beginLoading("Checking tokens and connecting…");
+    const fields = ["#sOwner", "#sRepo", "#sToken", "#sTokenReveal", "#sReadToken", "#sReadTokenReveal", "#sReadConfirm"];
+    fields.forEach((id) => { $(id).disabled = true; });
+    $("#sConnectionFields").setAttribute("aria-busy", "true");
     try {
-      const r = await gh("GET", "");
-      if (r.status === 401){ cfg = prev; sMsg("GitHub rejected that token.", true); }
-      else if (r.status === 404){ cfg = prev; sMsg("Can't find " + owner + "/" + repo + ". Check the spelling and that the token includes this repo.", true); }
-      else if (!r.ok){ cfg = prev; sMsg("GitHub returned an error (" + r.status + "). Try again.", true); }
-      else if (r.json.permissions && r.json.permissions.push === false){ cfg = prev; sMsg("This token can't write. Set Contents to Read and write.", true); }
-      else {
-        cfg.branch = r.json.default_branch || "main";
-        const b = await gh("GET", "branches/" + enc(cfg.branch));
-        if (b.status === 404){ cfg = prev; sMsg("That repo has no files yet. On GitHub, add a README to it once, then try again.", true); }
-        else {
-          cfg.locked = false; cfg.encryptedToken = null; deviceLocked = false;
-          resetRepoSession(); saveCfg(); canEdit = true;
-          closeSheets(); toast(r.json.private === false ? "Connected, but this repo is public. Make it private in the repo settings." : "Connected");
-          await start();
-        }
+      const r = await gh("GET", "", undefined, next);
+      if (!r.ok) throw githubError(r.status);
+      if (r.json?.permissions?.push === false) throw new Error("The editing token can't write. Set its Contents permission to Read and write.");
+      next.branch = r.json?.default_branch || "main";
+      const b = await gh("GET", "branches/" + enc(next.branch), undefined, next);
+      if (b.status === 404) throw new Error("That repository has no initialized branch. Add a README on GitHub, then try again.");
+      if (!b.ok) throw githubError(b.status);
+      if (readToken){
+        sMsg("Checking read-only token access for all folder links…");
+        await sharingGet(next, "branches/" + enc(next.branch), readToken);
       }
-    } catch (e) { cfg = prev; sMsg("Couldn't reach GitHub. Check your connection.", true); }
-    $("#sSave").disabled = false;
+      next = await protectDeviceConfig(next);
+      resetRepoSession(); cfg = next; saveCfg(); canEdit = true; deviceLocked = false;
+      // Secrets are never left in closed input fields, and never copied to folder forms.
+      $("#sToken").value = ""; $("#sReadToken").value = "";
+      closeSheets(); toast(r.json?.private === false ? "Connected, but this repository is public. Make it private in GitHub Settings." : "Connected · tokens saved in Settings");
+      await start();
+    } catch (e){
+      sMsg(e.name === "TypeError" ? "Couldn't reach GitHub. Check your connection and try again." : e.message || "Couldn't connect. Try again.", true);
+    } finally {
+      finish(); connecting = false; fields.forEach((id) => { $(id).disabled = false; });
+      $("#sConnectionFields").setAttribute("aria-busy", "false"); renderZipState();
+    }
   }
   function disconnect(){
     clearTimeout(saveTimer); cancelDrag(); state.reorder = false;
-    cfg.token = ""; cfg.locked = false; cfg.encryptedToken = null; deviceLocked = false;
+    cfg.token = ""; cfg.readToken = ""; cfg.readTokenConfirmed = false;
+    cfg.locked = false; cfg.encryptedToken = null; deviceLocked = false; deviceLockKey = null;
+    $("#sToken").value = ""; $("#sReadToken").value = "";
     saveCfg(); canEdit = false; resetRepoSession();
     urlCache.forEach((u) => URL.revokeObjectURL(u)); urlCache.clear();
     videoUrls.forEach((u) => URL.revokeObjectURL(u)); videoUrls.clear();
@@ -2779,7 +2937,8 @@ button[disabled]{cursor:default}
     setTimeout(() => URL.revokeObjectURL(url), 30000);
   }
   function resetRepoSession(){
-    cancelShareCheck(true); shareTokenDraft.clear();
+    cancelShareCheck(true);
+    libraryLoadController?.abort(); libraryLoadSerial++;
     repoSession++; clearTimeout(saveTimer); cancelDrag(); state.reorder = false; exitSelect();
     saveVersion = 0; savedVersion = 0; state.sync = "saved";
     deleted.items.clear(); deleted.folders.clear(); pendingDel.length = 0;
@@ -2974,7 +3133,7 @@ button[disabled]{cursor:default}
     });
     sortFolders(); state.sha = "sample-library-sha";
     state.shareLinks = [
-      {id:"slink-1", folderId:"ftravel", folderName:"Travel", createdAt:now-2*day, expiresAt:now+7*day, hasPassword:true, requireName:true, allowDl:false, revoked:false}
+      {id:"slink-1", folderId:"ftravel", folderName:"Travel", createdAt:now-2*day, expiresAt:now+7*day, passwordProtected:true, requireName:true, allowDl:false, revoked:false}
     ];
     state.shareRevokedBefore = 0;
     state.demoActivity = [
@@ -3089,8 +3248,8 @@ button[disabled]{cursor:default}
         event: "visuals_login",
         entry
       });
-      await fetch(url, {method:"POST", headers:{"Content-Type":"application/json"}, body, mode:"cors"}).catch(() =>
-        fetch(url, {method:"POST", headers:{"Content-Type":"text/plain;charset=utf-8"}, body, mode:"no-cors"})
+      await request(url, {method:"POST", headers:{"Content-Type":"application/json"}, body, mode:"cors"}, () => null, {timeout:5000, silent:true}).catch(() =>
+        request(url, {method:"POST", headers:{"Content-Type":"text/plain;charset=utf-8"}, body, mode:"no-cors"}, () => null, {timeout:5000, silent:true})
       );
       return true;
     } catch (e){ return false; }
@@ -3153,16 +3312,16 @@ button[disabled]{cursor:default}
     const list = loadLoginLogs();
     list.unshift(entry);
     saveLoginLogs(list);
-    const wh = webhook || shareWebhook || cfg.webhook || "";
+    const wh = webhook || shareWebhook || cfg.webhookUrl || "";
     if (wh) sendWebhookLog(wh, entry);
     if (canEdit) syncLoginEntryToRepo(entry);
     if (!$("#securitySheet").hidden) renderSecuritySheet();
     return entry;
   }
 
-  // ---------- sender-entered read-only token sharing ----------
+  // ---------- repository-wide sharing token managed in Settings ----------
   // Shared links can be encrypted with PBKDF2-SHA256 + AES-256-GCM so a leaked link never exposes the token in plaintext.
-  let shareCheckController = null, shareCheckSerial = 0, shareBusy = false;
+  let shareCheckController = null, shareCheckSerial = 0, shareBusy = false, shareBusyEnd = null;
   function shareMsg(text = "", bad = false){
     const el = $("#fShareMsg"); el.textContent = text; el.className = "formmsg" + (bad ? " bad" : "");
   }
@@ -3174,13 +3333,11 @@ button[disabled]{cursor:default}
     shareCheckSerial++;
     if (shareCheckController) shareCheckController.abort();
     shareCheckController = null; shareBusy = false;
+    if (shareBusyEnd) shareBusyEnd(); shareBusyEnd = null;
     if (clearFields){
-      if (!$("#fShareRemember").checked) shareTokenDraft.delete(repoKey());
-      $("#fShareToken").value = ""; $("#fShareToken").type = "password";
       $("#fSharePass").value = ""; $("#fSharePass").type = "password";
       $("#fSharePassReveal").textContent = "Show"; $("#fSharePassReveal").setAttribute("aria-pressed", "false");
-      $("#fShareBase").value = ""; $("#fShareConfirm").checked = false;
-      $("#fShareReveal").textContent = "Show"; $("#fShareReveal").setAttribute("aria-pressed", "false");
+      $("#fShareBase").value = "";
       clearShareOutput(); shareMsg();
     }
     updateSharingState();
@@ -3200,25 +3357,29 @@ button[disabled]{cursor:default}
   function defaultPublicAppAddress(){
     try { return publicAppAddress(location.href); } catch (e){ return ""; }
   }
-  function shareTokenError(token){
+  function shareTokenError(token, writeToken = cfg.token){
     if (!token) return "";
-    if (token === String(cfg.token || "").trim()) return "Never share your connected write token. Create a separate read-only token for the data repository.";
+    if (token === String(writeToken || "").trim()) return "Never share your connected write token. Create a separate read-only token for the data repository.";
     if (/^ghp_/i.test(token) || /^[0-9a-f]{40}$/i.test(token)) return "Classic personal access tokens are not suitable for read-only private-repo sharing. Create a fine-grained token with Contents set to Read-only.";
     return "";
   }
   function updateSharingState(){
-    const token = $("#fShareToken").value.trim();
+    const token = String(cfg.readToken || "").trim();
     const usePass = $("#fShareUsePass").checked;
     const pass = $("#fSharePass").value;
     $("#fSharePassFields").hidden = !usePass;
     let validAddress = false; try { publicAppAddress($("#fShareBase").value); validAddress = true; } catch (e) {}
     const unavailable = state.demo || !canEdit || !state.loaded || !!state.error;
     const locked = unavailable || shareBusy;
-    for (const id of ["#fShareToken", "#fShareUsePass", "#fSharePass", "#fSharePassReveal", "#fSharePassGen", "#fShareExpiry", "#fShareRequireName", "#fShareAllowDl", "#fShareWebhook", "#fShareBase", "#fShareConfirm", "#fShareRemember", "#fShareReveal"]){
+    for (const id of ["#fShareUsePass", "#fSharePass", "#fSharePassReveal", "#fSharePassGen", "#fShareExpiry", "#fShareRequireName", "#fShareAllowDl", "#fShareWebhook", "#fShareBase"]){
       $(id).disabled = locked;
     }
-    const passOk = !usePass || pass.length >= 4;
-    $("#fShareGo").disabled = locked || state.uploading || zipBusy || !token || !!shareTokenError(token) || !validAddress || !$("#fShareConfirm").checked || !passOk;
+    $("#fShareTokenStatus").textContent = token && cfg.readTokenConfirmed
+      ? "Using the read-only token saved in Settings for " + cfg.owner + "/" + cfg.repo + ". The same token is available to every folder."
+      : "Add and confirm a separate read-only token in Settings once before sharing any folder.";
+    $("#fShareSettings").disabled = shareBusy || state.uploading || zipBusy || connecting;
+    const passOk = !usePass || pass.length >= 6;
+    $("#fShareGo").disabled = locked || state.uploading || zipBusy || !token || !!shareTokenError(token) || !validAddress || !cfg.readTokenConfirmed || !passOk;
     $("#fShareGo").textContent = shareBusy ? "Encrypting & checking…" : "Check token & create link";
     $("#fCopyGo").disabled = !$("#fShareOut").textContent || shareBusy;
     $("#fCopyPassGo").disabled = !$("#fShareOut").textContent || shareBusy;
@@ -3233,7 +3394,7 @@ button[disabled]{cursor:default}
     if (!links.length){ listEl.replaceChildren(); return; }
     listEl.replaceChildren(...links.map((s) => h("div", {class:"sec-card"},
       h("div", {class:"sec-card-head"},
-        h("span", {class:"sec-card-title", text:"Link " + s.id + (s.hasPassword ? " (AES-256 Password)" : " (No password)")}),
+        h("span", {class:"sec-card-title", text:"Link " + s.id + (s.passwordProtected ? " (AES-256 Password)" : " (No password)")}),
         h("button", {class:"btn small danger", type:"button", text:"Revoke link", onclick:() => { revokeShareLink(s.id); renderFolderActiveLinks(folderId); }})
       ),
       h("div", {class:"sec-card-meta", text:"Created " + fmtLogTime(s.createdAt) + (s.expiresAt ? " · Expires " + new Date(s.expiresAt).toLocaleDateString() : " · Never expires")})
@@ -3241,21 +3402,17 @@ button[disabled]{cursor:default}
   }
   function prepareSharing(ctx){
     cancelShareCheck(true);
-    const f = findFolder(ctx.id), draft = shareTokenDraft.get(repoKey());
+    const f = findFolder(ctx.id);
     $("#fShareHeading").hidden = !!ctx.shareOnly;
     $("#fShareFolderName").textContent = f ? folderPath(f.id) : "";
     $("#fShareRepo").textContent = "Data repository: " + cfg.owner + "/" + cfg.repo;
     $("#fShareDemo").hidden = !state.demo;
-    $("#fShareToken").placeholder = state.demo ? "Connect visuals-data to enter a sharing token" : "Paste a separate github_pat_… token";
-    $("#fShareToken").value = !state.demo && draft ? draft.token : "";
-    $("#fShareBase").value = draft?.base || defaultPublicAppAddress();
-    $("#fShareWebhook").value = cfg.webhook || "";
+    $("#fShareBase").value = cfg.publicAppUrl || defaultPublicAppAddress();
+    $("#fShareWebhook").value = cfg.webhookUrl || "";
     $("#fShareUsePass").checked = true;
     $("#fShareRequireName").checked = true;
     $("#fShareAllowDl").checked = true;
     $("#fShareExpiry").value = "604800000";
-    $("#fShareConfirm").checked = !!(!state.demo && draft?.confirmed);
-    $("#fShareRemember").checked = true;
     renderFolderActiveLinks(ctx.id);
     updateSharingState();
   }
@@ -3263,33 +3420,30 @@ button[disabled]{cursor:default}
     if (!canEdit || !findFolder(id)) return;
     openFolderSheet({mode:"edit", id, shareOnly:true});
   }
-  function shareInputChanged(tokenChanged = false){
-    clearShareOutput(); shareMsg();
-    const token = $("#fShareToken").value.trim(), draft = shareTokenDraft.get(repoKey());
-    if (tokenChanged && (!draft || draft.token !== token)) $("#fShareConfirm").checked = false;
-    const error = shareTokenError(token); if (error) shareMsg(error, true);
-    updateSharingState();
+  function shareInputChanged(){
+    clearShareOutput(); shareMsg(); updateSharingState();
   }
   async function sharingGet(repo, path, token, signal, raw = false){
     const base = "https://api.github.com/repos/" + enc(repo.owner) + "/" + enc(repo.repo);
-    const r = await fetch(base + (path ? "/" + path : ""), {
+    return request(base + (path ? "/" + path : ""), {
       method:"GET", cache:"no-store", signal,
       headers:{"Accept":raw ? "application/vnd.github.raw+json" : "application/vnd.github+json", "X-GitHub-Api-Version":"2022-11-28", "Authorization":"Bearer " + token}
-    });
-    if (r.status === 401) throw new Error("GitHub rejected this token. It may be invalid or expired.");
-    if (r.status === 404) throw new Error("This token cannot find the data repo or library. Include " + repo.owner + "/" + repo.repo + " in its selected repositories.");
-    if (r.status === 403){
-      if (r.headers.get("x-ratelimit-remaining") === "0") throw new Error("GitHub's API rate limit was reached. Try creating the link again later.");
-      throw new Error("GitHub denied read access. Check this token's selected repository and Contents permission, or try again if GitHub is limiting requests.");
-    }
-    if (!r.ok) throw new Error("GitHub could not check access (status " + r.status + "). Try again.");
-    const scopes = (r.headers.get("x-oauth-scopes") || "").toLowerCase().split(",").map((x) => x.trim());
-    if (scopes.includes("repo") || scopes.includes("public_repo")) throw new Error("This token advertises write-capable classic repo scopes. Use a separate fine-grained read-only token instead.");
-    return raw ? r.text() : r.json();
+    }, async (r) => {
+      if (r.status === 401) throw new Error("GitHub rejected the read-only token. It may be invalid or expired. Replace it in Settings.");
+      if (r.status === 404) throw new Error("The read-only token cannot find the data repo, branch or library. Include " + repo.owner + "/" + repo.repo + " in its selected repositories.");
+      if (r.status === 403){
+        if (r.headers.get("x-ratelimit-remaining") === "0") throw new Error("GitHub's API rate limit was reached. Try again later.");
+        throw new Error("GitHub denied read access. Check this token's selected repository and Contents permission in GitHub Settings.");
+      }
+      if (!r.ok) throw new Error("GitHub could not check access (status " + r.status + "). Try again.");
+      const scopes = (r.headers.get("x-oauth-scopes") || "").toLowerCase().split(",").map((x) => x.trim());
+      if (scopes.includes("repo") || scopes.includes("public_repo")) throw new Error("This token advertises write-capable classic repo scopes. Use a separate fine-grained read-only token instead.");
+      return raw ? r.text() : r.json();
+    }, {label:"Checking read-only token…"});
   }
   async function buildShareLink(folderId, token, base, opts = {}){
     const url = new URL(base);
-    const linkId = opts.id || ("sl-" + uid());
+    const linkId = opts.id || ("sl-" + uid()), createdAt = opts.createdAt || Date.now();
     const inner = {
       o: cfg.owner,
       r: cfg.repo,
@@ -3297,6 +3451,7 @@ button[disabled]{cursor:default}
       t: token,
       f: folderId,
       id: linkId,
+      cat: createdAt,
       exp: opts.exp || 0,
       rn: opts.rn !== false,
       dl: opts.dl !== false,
@@ -3308,6 +3463,7 @@ button[disabled]{cursor:default}
       payloadObj = {
         enc: true,
         id: linkId,
+        cat: createdAt,
         f: folderId,
         exp: opts.exp || 0,
         rn: opts.rn !== false,
@@ -3315,22 +3471,22 @@ button[disabled]{cursor:default}
         ...encEnvelope
       };
     }
-    const payload = textB64(JSON.stringify(payloadObj)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+    const payload = b64url(JSON.stringify(payloadObj));
     url.hash = "share=" + payload;
-    return {url: url.toString(), linkId};
+    return {url:url.toString(), linkId, createdAt};
   }
   async function createFolderShareLink(){
     const ctx = folderCtx;
     if (!ctx || ctx.mode !== "edit" || !canEdit || shareBusy) return;
     if (state.demo){ shareMsg("Connect your real data repository to create a working share link.", true); return; }
     if (state.uploading || zipBusy){ shareMsg("Finish the current upload or backup first.", true); return; }
-    const token = $("#fShareToken").value.trim();
-    if (!token){ shareMsg("Paste a separate read-only token for your data repository.", true); return; }
+    const token = String(cfg.readToken || "").trim();
+    if (!token){ shareMsg("Save a separate read-only token in Settings before sharing.", true); return; }
     const tokenError = shareTokenError(token); if (tokenError){ shareMsg(tokenError, true); return; }
-    if (!$("#fShareConfirm").checked){ shareMsg("Confirm that you set Contents to Read-only on GitHub.", true); return; }
+    if (!cfg.readTokenConfirmed){ shareMsg("Confirm the sharing token's Read-only permission in Settings.", true); return; }
     const usePass = $("#fShareUsePass").checked;
     const pass = usePass ? $("#fSharePass").value : "";
-    if (usePass && pass.length < 4){ shareMsg("Enter a link password of at least 4 characters, or uncheck password encryption.", true); return; }
+    if (usePass && pass.length < 6){ shareMsg("Enter a link password of at least 6 characters, or uncheck password encryption.", true); return; }
     let base; try { base = publicAppAddress($("#fShareBase").value); } catch (e){ shareMsg(e.message, true); return; }
     const expMs = Number($("#fShareExpiry").value) || 0;
     const exp = expMs > 0 ? Date.now() + expMs : 0;
@@ -3338,9 +3494,10 @@ button[disabled]{cursor:default}
     const dl = $("#fShareAllowDl").checked;
     const wh = $("#fShareWebhook").value.trim();
     if (wh && !/^https:\/\//i.test(wh)){ shareMsg("Webhook URL must start with https://", true); return; }
-    if (wh && wh !== cfg.webhook){ cfg.webhook = wh; saveCfg(); }
+    if (wh && wh !== cfg.webhookUrl){ cfg.webhookUrl = wh; saveCfg(); }
     const repo = {...cfg}, session = repoSession, controller = new AbortController(), serial = ++shareCheckSerial;
     shareCheckController = controller; shareBusy = true; clearShareOutput();
+    const finish = beginLoading("Creating sharing link…"); shareBusyEnd = finish;
     shareMsg("Checking whether this token can read your data repository…"); updateSharingState();
     const stillCurrent = () => serial === shareCheckSerial && session === repoSession && folderCtx === ctx && !controller.signal.aborted;
     try {
@@ -3358,14 +3515,15 @@ button[disabled]{cursor:default}
       if (!Array.isArray(library.folders) || !library.folders.some((f) => f && f.id === ctx.id))
         throw new Error("The saved data repository does not contain this folder. Sync your library and try again.");
       if (!stillCurrent() || !findFolder(ctx.id)) return;
-      const {url, linkId} = await buildShareLink(ctx.id, token, base, {pass, exp, rn, dl, wh});
+      const {url, linkId, createdAt} = await buildShareLink(ctx.id, token, base, {pass, exp, rn, dl, wh});
+      if (!stillCurrent()) return;
       const linkMeta = cleanShareLink({
         id: linkId,
         folderId: ctx.id,
         folderName: folderPath(ctx.id),
-        createdAt: Date.now(),
+        createdAt,
         expiresAt: exp,
-        hasPassword: !!pass,
+        passwordProtected: !!pass,
         requireName: rn,
         allowDl: dl,
         revoked: false
@@ -3375,10 +3533,12 @@ button[disabled]{cursor:default}
         scheduleSave();
         renderFolderActiveLinks(ctx.id);
       }
+      shareMsg("Saving the link's expiry and revocation details…");
+      if (!(await flushSave())) throw new Error("The link's security details could not be saved. Retry sync before sharing.");
+      if (!stillCurrent()) return;
+      cfg.publicAppUrl = base; saveCfg();
       $("#fShareOut").textContent = url; $("#fShareOut").hidden = false; $("#fCopyBar").hidden = false;
       $("#fCopyPassGo").hidden = !pass;
-      if ($("#fShareRemember").checked) shareTokenDraft.set(repoKey(), {token, base, confirmed:true});
-      else shareTokenDraft.delete(repoKey());
       shareMsg((pass ? "AES-256 password-encrypted link ready. Even if this link leaks, the token cannot be decoded without your password." : "Link ready (no password set — consider adding a password so leaked links cannot expose your token).") + " You can revoke this link anytime below or in Security & Logins.");
       logActivity("Created " + (pass ? "password-encrypted " : "") + "share link for folder “" + folderPath(ctx.id) + "”", "security");
     } catch (e){
@@ -3388,7 +3548,8 @@ button[disabled]{cursor:default}
         : e?.name === "SyntaxError" ? "The saved library metadata could not be read. Sync your library and try again."
         : e.message || "Couldn't check this token. Try again.", true);
     } finally {
-      if (serial === shareCheckSerial){ shareBusy = false; shareCheckController = null; updateSharingState(); }
+      finish();
+      if (serial === shareCheckSerial){ shareBusyEnd = null; shareBusy = false; shareCheckController = null; updateSharingState(); }
     }
   }
   async function copyFolderShareLink(withPassword = false){
@@ -3414,7 +3575,10 @@ button[disabled]{cursor:default}
   }
   $("#folderShareBtn").replaceChildren(icon("share"), "Share folder");
   $("#folderShareBtn").addEventListener("click", () => openFolderShare());
-  $("#fShareToken").addEventListener("input", () => shareInputChanged(true));
+  $("#fShareSettings").addEventListener("click", () => {
+    closeTop(); openSettings();
+    setTimeout(() => { if (!$("#settings").hidden && !state.demo){ $("#sReadToken").focus(); $("#sReadToken").scrollIntoView({block:"center"}); } }, 30);
+  });
   $("#fShareUsePass").addEventListener("change", () => shareInputChanged());
   $("#fSharePass").addEventListener("input", () => shareInputChanged());
   $("#fSharePassReveal").addEventListener("click", () => {
@@ -3441,14 +3605,6 @@ button[disabled]{cursor:default}
     if (!$("#fShareBase").value.trim() || shareBusy) return;
     try { publicAppAddress($("#fShareBase").value); } catch (e){ shareMsg(e.message, true); }
   });
-  $("#fShareConfirm").addEventListener("change", () => shareInputChanged());
-  $("#fShareRemember").addEventListener("change", () => { if (!$("#fShareRemember").checked) shareTokenDraft.delete(repoKey()); });
-  $("#fShareReveal").addEventListener("click", () => {
-    const show = $("#fShareToken").type === "password";
-    $("#fShareToken").type = show ? "text" : "password";
-    $("#fShareReveal").textContent = show ? "Hide" : "Show";
-    $("#fShareReveal").setAttribute("aria-pressed", String(show));
-  });
   $("#fShareGo").addEventListener("click", createFolderShareLink);
   $("#fCopyGo").addEventListener("click", () => copyFolderShareLink(false));
   $("#fCopyPassGo").addEventListener("click", () => copyFolderShareLink(true));
@@ -3466,7 +3622,7 @@ button[disabled]{cursor:default}
     secPassMsg(); secWebhookMsg();
     $("#secLockPass").value = "";
     $("#secLockRequireName").checked = cfg.lockRequireName !== false;
-    $("#secWebhookUrl").value = cfg.webhook || "";
+    $("#secWebhookUrl").value = cfg.webhookUrl || "";
     renderSecuritySheet();
     openTop("#securitySheet");
   }
@@ -3486,8 +3642,8 @@ button[disabled]{cursor:default}
     const logBox = $("#secLogList");
     const hasLockedCfg = !!(cfg.locked && cfg.encryptedToken);
     $("#secLockStatus").textContent = hasLockedCfg
-      ? "Active: Your GitHub token on this device is encrypted with AES-256-GCM and requires your password on launch."
-      : "Not locked: Set a password below to encrypt your saved GitHub token on this device.";
+      ? "Active: Both GitHub tokens on this device are encrypted with AES-256-GCM and require your password on launch."
+      : "Not locked: Set a password below to encrypt both saved GitHub tokens on this device.";
     $("#secLockRemove").hidden = !hasLockedCfg;
     $("#secLockNow").hidden = !hasLockedCfg;
 
@@ -3529,12 +3685,12 @@ button[disabled]{cursor:default}
       const lrows = links.map((s) => {
         const isRevoked = s.revoked || (state.shareRevokedBefore && s.createdAt <= state.shareRevokedBefore);
         const isExpired = s.expiresAt > 0 && now > s.expiresAt;
-        const stText = isRevoked ? "Revoked" : isExpired ? "Expired" : (s.hasPassword ? "Active · AES-256" : "Active");
-        const stClass = (isRevoked || isExpired) ? "bad" : (s.hasPassword ? "ok" : "warn");
+        const stText = isRevoked ? "Revoked" : isExpired ? "Expired" : (s.passwordProtected ? "Active · AES-256" : "Active");
+        const stClass = (isRevoked || isExpired) ? "bad" : (s.passwordProtected ? "ok" : "warn");
         const details = [
           "Created " + fmtLogTime(s.createdAt),
           s.expiresAt ? ("Expires " + new Date(s.expiresAt).toLocaleDateString()) : "No expiry",
-          s.hasPassword ? "Password-encrypted" : "No password",
+          s.passwordProtected ? "Password-encrypted" : "No password",
           s.allowDl ? "Downloads allowed" : "View-only (downloads blocked)"
         ].join(" · ");
         return h("div", {class:"sec-card"},
@@ -3569,30 +3725,32 @@ button[disabled]{cursor:default}
     toast("All existing shared links have been revoked.");
   }
   async function saveDevicePassword(){
+    if ($("#secLockSave").disabled) return;
     const pass = $("#secLockPass").value;
     if (!pass || pass.length < 4){ secPassMsg("Enter a password of at least 4 characters.", true); return; }
     if (!cfg.token && !state.demo){ secPassMsg("Connect your repository before setting a device password.", true); return; }
+    const finish = beginLoading("Encrypting device tokens…"); $("#secLockSave").disabled = true;
     try {
       const tokenToProtect = state.demo ? "sample-demo-token" : cfg.token;
-      cfg.encryptedToken = await encryptPayload({token: tokenToProtect, owner: cfg.owner, repo: cfg.repo}, pass);
+      cfg.encryptedToken = await encryptPayload({token:tokenToProtect, readToken:cfg.readToken || "", owner:cfg.owner, repo:cfg.repo, branch:cfg.branch}, pass, (key) => { deviceLockKey = key; });
       cfg.locked = true;
       cfg.lockRequireName = $("#secLockRequireName").checked;
       saveCfg();
       $("#secLockPass").value = "";
-      secPassMsg("Device password saved. Your GitHub token is now AES-256 encrypted in browser storage.");
+      secPassMsg("Device password saved. Both GitHub tokens are now AES-256 encrypted in browser storage.");
       logActivity("Enabled AES-256 device password lock", "security");
       renderHeader();
       renderSecuritySheet();
     } catch (e){
-      secPassMsg("Could not encrypt token: " + (e.message || "error"), true);
-    }
+      secPassMsg("Could not encrypt tokens: " + (e.message || "error"), true);
+    } finally { finish(); $("#secLockSave").disabled = false; }
   }
   function removeDevicePassword(){
     cfg.locked = false;
     cfg.encryptedToken = null;
-    deviceLocked = false;
+    deviceLocked = false; deviceLockKey = null;
     saveCfg();
-    secPassMsg("Device password removed. Token is stored in standard local storage.");
+    secPassMsg("Device password removed. Both tokens are stored in standard local storage.");
     logActivity("Removed device password lock", "security");
     renderHeader();
     renderSecuritySheet();
@@ -3604,7 +3762,8 @@ button[disabled]{cursor:default}
       return;
     }
     closeTop(); closeSheets();
-    cfg.token = "";
+    cfg.token = ""; cfg.readToken = ""; deviceLockKey = null;
+    $("#sToken").value = ""; $("#sReadToken").value = "";
     canEdit = false;
     deviceLocked = true;
     state.items = []; state.folders = [];
@@ -3614,12 +3773,12 @@ button[disabled]{cursor:default}
   function saveWebhookConfig(){
     const url = $("#secWebhookUrl").value.trim();
     if (url && !/^https:\/\//i.test(url)){ secWebhookMsg("Webhook URL must start with https://", true); return; }
-    cfg.webhook = url;
+    cfg.webhookUrl = url;
     saveCfg();
     secWebhookMsg(url ? "Webhook saved. Login events will be sent to this endpoint." : "Webhook cleared.");
   }
   async function testWebhookConfig(){
-    const url = $("#secWebhookUrl").value.trim() || cfg.webhook;
+    const url = $("#secWebhookUrl").value.trim() || cfg.webhookUrl;
     if (!url || !/^https:\/\//i.test(url)){ secWebhookMsg("Enter a valid https:// webhook URL first.", true); return; }
     secWebhookMsg("Sending test login event…");
     const entry = await recordLoginEvent({status:"test_webhook", mode:"security_test", user:"Owner (Webhook Test)", folder:"Security Center", webhook:url});
@@ -3661,7 +3820,8 @@ button[disabled]{cursor:default}
     const gate = $("#loginGate");
     gate.hidden = false;
     loginGateMsg();
-    $("#lgPass").value = "";
+    $("#lgPass").value = ""; $("#lgPass").type = "password";
+    $("#lgReveal").textContent = "Show"; $("#lgReveal").setAttribute("aria-pressed", "false");
     $("#lgNote").value = "";
     if (mode === "device"){
       $("#lgTitle").textContent = "Unlock My Visuals";
@@ -3672,11 +3832,11 @@ button[disabled]{cursor:default}
       $("#lgOwnerResetRow").hidden = false;
       $("#lgNotice").textContent = "Unlock attempts are logged with timestamp, IP address and device details in your Security & Login Logs.";
     } else {
-      const hasPass = !!sharePayload?.enc;
+      const hasPass = shareEncrypted;
       const reqName = shareRequireName;
       $("#lgTitle").textContent = hasPass ? "Protected Shared Folder" : "Sign In to Shared Folder";
       $("#lgSub").textContent = hasPass
-        ? "This shared link is encrypted with a password. Enter your name and the link password to decrypt and open the folder."
+        ? "Enter " + (reqName ? "your name and " : "") + "the link password to decrypt and open this shared folder."
         : "Enter your name or email to open this shared folder.";
       $("#lgVisitorRow").hidden = !reqName;
       $("#lgNoteRow").hidden = !reqName;
@@ -3694,87 +3854,55 @@ button[disabled]{cursor:default}
     const btn = $("#lgSubmit");
     if (btn.disabled) return;
     loginGateMsg();
-    const visitor = $("#lgVisitor").value.trim();
-    const note = $("#lgNote").value.trim();
+    const visitor = $("#lgVisitor").value.trim(), note = $("#lgNote").value.trim(), pass = $("#lgPass").value;
     if (deviceLocked && !shareMode){
-      if (cfg.lockRequireName !== false && !visitor){
-        loginGateMsg("Please enter your name to log in on this device.", true);
-        $("#lgVisitor").focus();
-        return;
-      }
-      const pass = $("#lgPass").value;
+      if (cfg.lockRequireName !== false && !visitor){ loginGateMsg("Please enter your name to log in on this device.", true); $("#lgVisitor").focus(); return; }
       if (!pass){ loginGateMsg("Enter your device password.", true); $("#lgPass").focus(); return; }
+      const finish = beginLoading("Unlocking your library…");
       btn.disabled = true; btn.textContent = "Decrypting…";
       try {
-        const dec = await decryptPayload(cfg.encryptedToken, pass);
-        if (!dec || !dec.token) throw new Error("Invalid password");
-        if (!state.demo) cfg.token = dec.token;
-        deviceLocked = false;
-        canEdit = !!(cfg.owner && cfg.repo && (cfg.token || state.demo));
-        $("#loginGate").hidden = true;
+        const dec = await decryptPayload(cfg.encryptedToken, pass, (key) => { deviceLockKey = key; });
+        if (!dec || !dec.token) throw new Error("Invalid encrypted device credentials.");
+        if (!state.demo){
+          cfg.token = dec.token; cfg.readToken = dec.readToken || "";
+          cfg.owner = dec.owner || cfg.owner; cfg.repo = dec.repo || cfg.repo; cfg.branch = dec.branch || cfg.branch;
+        }
+        deviceLocked = false; canEdit = !!(cfg.owner && cfg.repo && (cfg.token || state.demo));
+        $("#loginGate").hidden = true; $("#lgPass").value = "";
         recordLoginEvent({status:"success", mode:"device_lock", user:visitor || "Owner", note});
-        toast("Unlocked");
-        await start();
+        toast("Unlocked"); await start();
       } catch (err){
         recordLoginEvent({status:"failed_password", mode:"device_lock", user:visitor || "Unknown (Device Lock)", note});
-        loginGateMsg("Incorrect password. This attempt has been logged.", true);
-      } finally {
-        btn.disabled = false; btn.textContent = "Unlock & Log In";
-      }
+        loginGateMsg(err.name === "OperationError" ? "Incorrect password. This attempt has been logged." : err.message || "Could not unlock this device.", true);
+      } finally { finish(); btn.disabled = false; btn.textContent = "Unlock & Log In"; }
       return;
     }
     if (shareMode){
-      if (shareRequireName && !visitor){
-        loginGateMsg("Please enter your name or email to continue.", true);
-        $("#lgVisitor").focus();
-        return;
-      }
-      const pass = $("#lgPass").value;
-      if (sharePayload?.enc && !pass){
-        loginGateMsg("Enter the password for this shared link.", true);
-        $("#lgPass").focus();
-        return;
-      }
-      btn.disabled = true; btn.textContent = "Verifying & logging in…";
+      if (shareRequireName && !visitor){ loginGateMsg("Please enter your name or email to continue.", true); $("#lgVisitor").focus(); return; }
+      if (shareEncrypted && !pass){ loginGateMsg("Enter the password for this shared link.", true); $("#lgPass").focus(); return; }
+      const finish = beginLoading(shareEncrypted ? "Decrypting shared link…" : "Opening shared folder…");
+      btn.disabled = true; btn.textContent = "Opening shared folder…";
       try {
-        if (sharePayload?.enc){
-          const dec = await decryptPayload(sharePayload, pass);
-          if (!dec || !dec.t || !dec.o || !dec.r) throw new Error("Invalid password");
-          cfg = {owner:dec.o, repo:dec.r, branch:dec.b || "main", token:dec.t, webhook:dec.wh || ""};
-          shareFolderId = dec.f || shareFolderId;
-          shareLinkId = dec.id || shareLinkId;
-          shareExpiresAt = Number(dec.exp) || shareExpiresAt;
-          shareAllowDl = dec.dl !== false;
-          shareWebhook = dec.wh || "";
+        if (shareEncrypted){
+          const dec = await decryptPayload(shareEnvelope, pass);
+          applySharePayload(dec);
+          // The encrypted inner options are authoritative, not editable outer URL fields.
+          if (shareRequireName && !visitor){
+            $("#lgVisitorRow").hidden = false;
+            loginGateMsg("Please enter your name or email to continue.", true); $("#lgVisitor").focus(); return;
+          }
         }
-        shareVisitorName = visitor || "Visitor";
-        shareLocked = false;
-        $("#loginGate").hidden = true;
+        shareVisitorName = visitor || "Visitor"; shareLocked = false;
+        $("#loginGate").hidden = true; $("#lgPass").value = "";
         await start();
-        recordLoginEvent({
-          status: state.error ? "link_error" : "success",
-          mode: "share_link",
-          user: shareVisitorName,
-          note,
-          folderId: shareFolderId,
-          folder: findFolder(shareFolderId)?.name || shareFolderId,
-          linkId: shareLinkId,
-          webhook: shareWebhook
-        });
+        recordLoginEvent({status:state.error ? "link_error" : "success", mode:"share_link", user:shareVisitorName, note,
+          folderId:shareFolderId, folder:findFolder(shareFolderId)?.name || shareFolderId, linkId:shareLinkId, webhook:shareWebhook});
       } catch (err){
-        recordLoginEvent({
-          status: "failed_password",
-          mode: "share_link",
-          user: visitor || "Unknown visitor",
-          note,
-          folderId: shareFolderId,
-          linkId: shareLinkId,
-          webhook: shareWebhook
-        });
-        loginGateMsg("Incorrect password for this shared link. Attempt logged.", true);
-      } finally {
-        btn.disabled = false; btn.textContent = "Unlock & Log In";
-      }
+        recordLoginEvent({status:err.name === "OperationError" ? "failed_password" : "link_error", mode:"share_link", user:visitor || "Unknown visitor", note,
+          folderId:shareFolderId, linkId:shareLinkId, webhook:shareWebhook});
+        loginGateMsg(err.name === "OperationError" ? "Incorrect password for this shared link. This attempt has been logged."
+          : err.message || "This shared link could not be opened. Ask the owner for a new link.", true);
+      } finally { finish(); btn.disabled = false; btn.textContent = "Unlock & Log In"; }
     }
   }
 
@@ -3914,6 +4042,14 @@ button[disabled]{cursor:default}
   $("#dFav").addEventListener("click", () => { const it = find(state.openId); if (it) patch(it.id, {fav: !it.fav}); });
   $("#dDl").addEventListener("click", () => download(state.openId));
   $("#dDel").addEventListener("click", remove);
+  for (const [inputId, buttonId, label] of [["#sToken", "#sTokenReveal", "read and write token"], ["#sReadToken", "#sReadTokenReveal", "read-only token"]]){
+    $(buttonId).addEventListener("click", () => {
+      const show = $(inputId).type === "password";
+      $(inputId).type = show ? "text" : "password"; $(buttonId).textContent = show ? "Hide" : "Show";
+      $(buttonId).setAttribute("aria-pressed", String(show)); $(buttonId).setAttribute("aria-label", (show ? "Hide " : "Show ") + label);
+    });
+  }
+  $("#sReadToken").addEventListener("input", () => { $("#sReadConfirm").checked = false; sMsg(""); });
   $("#sSave").addEventListener("click", connect);
   $("#sOut").addEventListener("click", disconnect);
 
@@ -3937,60 +4073,59 @@ button[disabled]{cursor:default}
     if (state.demo && msg) b.append(h("button", {class:"textbtn", type:"button", text:"Exit sample", onclick:exitDemo}));
   }
   async function start(){
-    state.loaded = false; state.error = null; banner(""); render();
-    if (shareMode && shareExpiresAt > 0 && Date.now() > shareExpiresAt){
-      state.items = []; state.folders = []; state.loaded = true; state.error = true;
-      $("#loginGate").hidden = true;
-      banner("This shared link has expired. Ask the owner for a new link.");
-      recordLoginEvent({status:"expired_link", mode:"share_link", user:shareVisitorName || "Visitor", folderId:shareFolderId, linkId:shareLinkId, webhook:shareWebhook});
-      render();
-      return;
-    }
-    if (deviceLocked && !shareMode){
-      state.items = []; state.folders = []; state.loaded = true;
-      render();
-      showLoginGate("device");
-      return;
-    }
-    if (shareMode && shareLocked){
-      state.items = []; state.folders = []; state.loaded = true;
-      render();
-      showLoginGate("share");
-      return;
-    }
-    if (!canEdit && !shareMode){ state.items = []; state.folders = []; state.loaded = true; applyRoute(); render(); return; }
-    try { await loadLibrary(); }
-    catch (e){
-      if (e && e.status === 401){
-        canEdit = false; state.items = []; state.folders = [];
-        banner(shareMode ? "This link no longer works or its token was revoked. Ask for a new one." : "GitHub rejected your token. Open settings to reconnect.");
-      } else state.error = true;
-    }
-    state.loaded = true;
-    if (shareMode){
-      const linkEntry = shareLinkId ? (state.shareLinks || []).find((s) => s.id === shareLinkId) : null;
-      const revokedByEntry = !!(linkEntry && linkEntry.revoked);
-      const revokedByCut = !!(state.shareRevokedBefore && linkEntry && linkEntry.createdAt <= state.shareRevokedBefore);
-      if (revokedByEntry || revokedByCut){
-        state.items = []; state.folders = []; state.folder = null; state.error = true;
-        banner("This shared link was revoked by the owner because it may have been leaked.");
-        recordLoginEvent({status:"revoked_link", mode:"share_link", user:shareVisitorName || "Visitor", folderId:shareFolderId, linkId:shareLinkId, webhook:shareWebhook});
-        render();
+    libraryLoadController?.abort();
+    const controller = new AbortController(), serial = ++libraryLoadSerial, session = repoSession;
+    libraryLoadController = controller;
+    const current = () => serial === libraryLoadSerial && session === repoSession && !controller.signal.aborted;
+    const finish = beginLoading(shareMode ? "Loading shared folder…" : "Loading your library…");
+    const fail = (message) => {
+      state.error = message; state.items = []; state.folders = []; state.folder = null; banner(message);
+    };
+    state.loaded = false; state.error = null;
+    try {
+      banner(""); render();
+      if (shareParseError){ fail(shareParseError); return; }
+      if (shareMode && shareExpiresAt > 0 && Date.now() > shareExpiresAt){
+        $("#loginGate").hidden = true; fail("This shared link has expired. Ask the owner for a new link.");
+        recordLoginEvent({status:"expired_link", mode:"share_link", user:shareVisitorName || "Visitor", folderId:shareFolderId, linkId:shareLinkId, webhook:shareWebhook});
         return;
       }
-      if (linkEntry && linkEntry.allowDl === false) shareAllowDl = false;
-      const allowed = findFolder(shareFolderId) ? descendants(shareFolderId) : new Set();
-      state.items = state.items.filter((i) => allowed.has(i.folder));
-      state.folders = state.folders.filter((f) => allowed.has(f.id)).map((f) => f.id === shareFolderId ? {...f, parent:null} : f);
-      state.folder = findFolder(shareFolderId) ? shareFolderId : null;
-      applyRoute();
-      if (!state.error && !state.folder) toast("This folder isn't available anymore.");
-      else if (!state.error) banner("Shared folder" + (shareVisitorName ? " · signed in as " + shareVisitorName : "") + (shareAllowDl ? " · view and download only." : " · view-only (downloads disabled)."));
-    } else {
-      applyRoute();
-      if (state.demo) banner("Sample library · explore the features safely (including Security & Logins). Changes stay in this tab and reset on reload.");
+      if (deviceLocked && !shareMode){ state.items = []; state.folders = []; showLoginGate("device"); return; }
+      if (shareMode && shareLocked){ state.items = []; state.folders = []; showLoginGate("share"); return; }
+      if (!canEdit && !shareMode){ state.items = []; state.folders = []; applyRoute(); return; }
+      await loadLibrary(controller.signal, current);
+      if (!current()) return;
+      if (shareMode){
+        const linkEntry = shareLinkId ? (state.shareLinks || []).find((s) => s.id === shareLinkId) : null;
+        const createdAt = linkEntry?.createdAt || shareCreatedAt;
+        if (linkEntry?.revoked || (state.shareRevokedBefore && createdAt && createdAt <= state.shareRevokedBefore)){
+          fail("This shared link was revoked by the owner. Ask for a new link.");
+          recordLoginEvent({status:"revoked_link", mode:"share_link", user:shareVisitorName || "Visitor", folderId:shareFolderId, linkId:shareLinkId, webhook:shareWebhook});
+          return;
+        }
+        if (linkEntry?.expiresAt > 0 && Date.now() > linkEntry.expiresAt){ fail("This shared link has expired. Ask the owner for a new link."); return; }
+        if (linkEntry?.allowDl === false) shareAllowDl = false;
+        const allowed = findFolder(shareFolderId) ? descendants(shareFolderId) : new Set();
+        state.items = state.items.filter((i) => allowed.has(i.folder));
+        state.folders = state.folders.filter((f) => allowed.has(f.id)).map((f) => f.id === shareFolderId ? {...f, parent:null} : f);
+        state.folder = findFolder(shareFolderId) ? shareFolderId : null;
+        if (!state.folder){ fail("This shared folder no longer exists. Ask the owner for a new link."); return; }
+        applyRoute();
+        banner("Shared folder" + (shareVisitorName ? " · signed in as " + shareVisitorName : "") + (shareAllowDl ? " · view and download only." : " · view-only (downloads disabled)."));
+      } else {
+        applyRoute();
+        if (state.demo) banner("Sample library · explore the features safely (including Security & Logins). Changes stay in this tab and reset on reload.");
+      }
+    } catch (e){
+      if (!current()) return;
+      fail(e.name === "TypeError" ? "Couldn't reach GitHub. Check your connection and try again." : e.message || "The library couldn't be loaded. Try again.");
+    } finally {
+      finish();
+      if (serial === libraryLoadSerial && session === repoSession){
+        libraryLoadController = null; state.loaded = true; render();
+        if (canEdit && !state.error && !deviceLocked) refreshStorage();
+      }
     }
-    render(); if (canEdit && !state.error) refreshStorage();
   }
 
   start();

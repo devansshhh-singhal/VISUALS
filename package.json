@@ -1,0 +1,12 @@
+{
+  "name": "my-visuals",
+  "private": true,
+  "scripts": {
+    "dev": "python3 scripts/serve.py --host 0.0.0.0 --port 4173",
+    "test": "playwright test",
+    "test:install": "playwright install chromium"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.63.0"
+  }
+}
