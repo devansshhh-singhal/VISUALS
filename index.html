@@ -886,7 +886,7 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
 
   <div class="sec-section" id="sAuditSection">
     <h3>Audit &amp; insight</h3>
-    <p class="hint" style="margin:0 0 10px">Every action — logins, file views, downloads, uploads, edits, deletions, sharing and settings changes — is recorded with who did it, when, and from which device.</p>
+    <p class="hint" style="margin:0 0 10px">Security-relevant link access, downloads and uploads are recorded, along with owner changes. Routine browsing — opening files, filtering, searching and playback — is not tracked.</p>
     <div class="sec-actions">
       <button class="btn small" id="sAudit" type="button">Audit log</button>
       <button class="btn small" id="sAnalytics" type="button">Sharing analytics</button>
@@ -1105,7 +1105,7 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
 
   <div class="sec-section">
     <h3 id="secWebhookHeading">Receiver Activity Webhook</h3>
-    <p class="hint" style="margin:0 0 10px">Receive every recorded receiver visit, access attempt, file view, download and upload at one HTTPS endpoint. Failed deliveries stay in a persistent queue and retry. Custom endpoints must permit CORS and return HTTP 2xx; use a CORS-enabled relay for Slack. The URL is shared with recipients, including outside encrypted links for access-attempt logging: use a dedicated, limited-purpose endpoint, not a privileged secret.</p>
+    <p class="hint" style="margin:0 0 10px">Receive shared-link visits and access attempts plus download and upload outcomes at one HTTPS endpoint. Routine browsing (file opens, searches, filters and playback) is not tracked. Failed deliveries stay in a persistent queue and retry. Custom endpoints must permit CORS and return HTTP 2xx; use a CORS-enabled relay for Slack. The URL is shared with recipients, including outside encrypted links for access-attempt logging: use a dedicated, limited-purpose endpoint, not a privileged secret.</p>
     <label class="field" style="margin-top:8px">
       <span class="lbl">Shared activity webhook URL</span>
       <input id="secWebhookUrl" type="url" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="https://discord.com/api/webhooks/…">
@@ -1216,7 +1216,7 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
       <option value="login">Logins &amp; access</option>
       <option value="files">Files &amp; uploads</option>
       <option value="share">Sharing</option>
-      <option value="view">Views &amp; downloads</option>
+      <option value="view">Downloads &amp; archived views</option>
       <option value="edit">Organizing &amp; edits</option>
       <option value="system">Settings &amp; system</option>
     </select>
@@ -1416,8 +1416,6 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
   let lastTelemetry = null, telemetryPromise = null, offlineQueued = 0;
   const activitySessionId = "vs-" + (crypto.randomUUID?.() || Date.now().toString(36) + "-" + Math.random().toString(36).slice(2));
   let activitySequence = 0, shareEntryLogged = false, shareAccessLogged = false, shareAccessNote = "";
-  const shareSessionStarted = Date.now();
-  let viewerSince = 0, viewerDwellId = "";
 
   // ---------- config & Web Crypto encryption ----------
   function detect(){
@@ -2423,7 +2421,6 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
 
   // ---------- navigation ----------
   function applyRoute(){
-    const previousFolder = state.folder;
     let id = null;
     if (shareMode) id = history.state?.sharedFolder || shareRootFolder();
     else if (state.demo) id = history.state?.demoFolder || null;
@@ -2452,14 +2449,12 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
       exitSelect();
     }
     state.folder = id; readView();
-    if (shareMode && state.loaded && !state.error && previousFolder !== id && id) audit("view.folder", "Viewed folder “" + folderPath(id) + "”", {count:visible().length});
   }
   function navigate(id){
     id = findFolder(id) ? id : null;
     state.collectionId = ""; state.smartId = "";
     if (shareMode && !id) id = findFolder(shareRootFolder()) ? shareRootFolder() : null;
     if (id === state.folder) return;
-    flushSearchActivity();
     cancelDrag(); state.reorder = false; exitSelect();
     state.tag = null; state.fav = false; state.vid = false; state.geo = false; state.q = ""; $("#q").value = "";
     try {
@@ -2468,7 +2463,6 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
       else history.pushState({folder:id}, "", id ? "#f=" + enc(id) : location.pathname + location.search);
     } catch (e) {}
     state.folder = id; readView(); render(); window.scrollTo(0, 0);
-    if (shareMode && id) audit("view.folder", "Viewed folder “" + folderPath(id) + "”", {count:visible().length});
   }
 
   // Fragment-only navigation does not rerun this script. Reload when entering,
@@ -2800,17 +2794,17 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     const hasGeo = scope.some((i) => i.exif && i.exif.gps);
     if (state.geo && !hasGeo) state.geo = false;
     box.hidden = !state.loaded || scope.length === 0;
-    const reset = () => { state.tag = null; state.fav = false; state.vid = false; state.geo = false; render(); logVisitorFilter("All", true); };
+    const reset = () => { state.tag = null; state.fav = false; state.vid = false; state.geo = false; render(); };
     box.replaceChildren(
       h("button", {class:"chip", type:"button", "aria-pressed": String(!state.tag && !state.fav && !state.vid && !state.geo), text:"All", onclick:reset}),
       h("button", {class:"chip", type:"button", "aria-pressed": String(state.fav),
-        onclick:() => { state.fav = !state.fav; render(); logVisitorFilter("Favorites", state.fav); }}, icon("heart"), "Favorites"),
+        onclick:() => { state.fav = !state.fav; render(); }}, icon("heart"), "Favorites"),
       ...(hasVid ? [h("button", {class:"chip", type:"button", "aria-pressed": String(state.vid),
-        onclick:() => { state.vid = !state.vid; render(); logVisitorFilter("Videos", state.vid); }}, icon("video"), "Videos")] : []),
+        onclick:() => { state.vid = !state.vid; render(); }}, icon("video"), "Videos")] : []),
       ...(hasGeo ? [h("button", {class:"chip", type:"button", "aria-pressed": String(state.geo),
-        onclick:() => { state.geo = !state.geo; render(); logVisitorFilter("Geotagged", state.geo); }}, icon("info"), "Geotagged")] : []),
+        onclick:() => { state.geo = !state.geo; render(); }}, icon("info"), "Geotagged")] : []),
       ...counts.map(([t, n]) => h("button", {class:"chip", type:"button", "aria-pressed": String(state.tag === t),
-        onclick:() => { state.tag = state.tag === t ? null : t; render(); logVisitorFilter("Tag “" + t + "”", state.tag === t); }}, t, h("small", {text:String(n)})))
+        onclick:() => { state.tag = state.tag === t ? null : t; render(); }}, t, h("small", {text:String(n)})))
     );
     box.scrollLeft = left;
   }
@@ -3402,7 +3396,7 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     return (Array.isArray(log) ? log : []).filter((e) => e && typeof e.msg === "string" && Number.isFinite(Number(e.t))).slice(0, ACT_LIMIT);
   }
   function logActivity(msg, type = "edit", opts = {}){
-    // The audit log keeps every action, for owners and for visitors on an upload link.
+    // The receiver allowlist filters this down to meaningful transfer/security events.
     audit(opts.kind || ACTIVITY_TO_AUDIT[type] || "app.event", msg, opts);
     if (!canEdit || shareMode) return;
     const log = loadActivity(); log.unshift({id:uid(), t:Date.now(), type, msg});
@@ -3442,10 +3436,12 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     if (!activityClearArmed) $("#aClear").textContent = "Clear log";
   }
   function openActivity(){
+    if (!canEdit || shareMode) return;
     $("#aSearch").value = ""; $("#aFilter").value = "all";
     activityClearArmed = false; clearTimeout(activityClearTimer); renderActivity(); openTop("#activitySheet");
   }
   function clearActivity(){
+    if (!canEdit || shareMode) return;
     if (!activityClearArmed){
       activityClearArmed = true; $("#aClear").textContent = "Confirm clear";
       activityClearTimer = setTimeout(() => { activityClearArmed = false; renderActivity(); }, 5000); return;
@@ -3525,7 +3521,6 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
   }
   function openDetail(id){
     const it = find(id); if (!it) return;
-    audit("view.details", "Opened details for “" + (it.name || "file") + "”", {imageId:it.id, imageName:it.name});
     state.openId = id;
     const img = $("#dImg");
     img.removeAttribute("src"); img.alt = it.name || "";
@@ -4294,7 +4289,6 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
       img.dataset.loading = "1";
       getUrl(it, false, true).then((u) => { img.src = u; img.dataset.q = "full"; }, () => {
         delete img.dataset.loading;
-        if (viewer.open && viewer.ids[viewer.idx] === it.id) audit("view.error", "Could not load file “" + (it.name || "file") + "”", {imageId:it.id, imageName:it.name, status:"failed"});
       });
     }
   }
@@ -4303,7 +4297,6 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     if (!it) return;
     $("#vName").textContent = it.name || "Untitled";
     $("#vCount").textContent = (i + 1) + " of " + n;
-    noteViewerDwell(it);
     const fav = $("#vFav");
     fav.hidden = !canEdit; $("#vInfo").hidden = false;
     $("#vDl").hidden = shareMode && !shareAllowDl;
@@ -4313,23 +4306,6 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     ensureSlide(i, true);
     ensureSlide(i - 1, true); ensureSlide(i + 1, true);   // neighbours are ready before you swipe
     pauseOthers();
-  }
-  function flushViewerDwell(reason = "closed"){
-    const id = viewerDwellId, since = viewerSince;
-    viewerDwellId = ""; viewerSince = 0;
-    if (!id || !since) return;
-    const it = find(id); if (!it) return;
-    const ms = Math.max(0, Date.now() - since);
-    audit("view.dwell", "Viewed “" + (it.name || "file") + "” for " + fmtTime(Math.round(ms / 1000)),
-      {imageId:it.id, imageName:it.name, ms, note:reason});
-  }
-  function noteViewerDwell(it){
-    if (!it || viewerDwellId === it.id) return;
-    flushViewerDwell("next_file");
-    viewerDwellId = it.id; viewerSince = Date.now();
-    // Record the open immediately. Fast reopens and sub-second views are distinct
-    // actions, not collapsed or dropped while waiting for a dwell-time threshold.
-    audit("view.image", "Opened “" + (it.name || "file") + "”", {imageId:it.id, imageName:it.name});
   }
   function openViewer(id){
     const ids = visible().map((i) => i.id), idx = ids.indexOf(id);
@@ -4346,7 +4322,6 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
   }
   function hideViewer(){
     if (!viewer.open) return;
-    flushViewerDwell();
     viewer.open = false; viewer.pushed = false;
     $("#viewer").hidden = true;
     vScroll().querySelectorAll("video").forEach((v) => v.pause());
@@ -4404,7 +4379,6 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
       if (slide.isConnected) buildPlayer(slide, it, url);
     } catch (e) {
       delete slide.dataset.loading; btn.disabled = false; hint.textContent = "Couldn't load. Tap to retry";
-      audit("video.error", "Could not load video “" + (it.name || "file") + "”", {imageId:it.id, imageName:it.name, status:"failed"});
     }
   }
   function buildPlayer(slide, it, url){
@@ -4428,12 +4402,7 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     const toggle = () => { if (v.paused){ const pr = v.play(); if (pr && pr.catch) pr.catch(() => {}); } else v.pause(); };
     v.addEventListener("click", toggle);
     play.addEventListener("click", toggle);
-    for (const ev of ["play", "pause", "ended"]) v.addEventListener(ev, () => {
-      setIcon();
-      audit("video." + ev, (ev === "play" ? "Played" : ev === "pause" ? "Paused" : "Finished") + " video “" + (it.name || "file") + "”",
-        {imageId:it.id, imageName:it.name, position:Math.round(v.currentTime * 1000)});
-    });
-    v.addEventListener("seeked", () => audit("video.seek", "Seeked video “" + (it.name || "file") + "”", {imageId:it.id, imageName:it.name, position:Math.round(v.currentTime * 1000)}));
+    for (const ev of ["play", "pause", "ended"]) v.addEventListener(ev, setIcon);
     v.addEventListener("timeupdate", paint); v.addEventListener("loadedmetadata", paint);
     const endDrag = () => { dragging = false; };
     seek.addEventListener("pointerdown", () => { dragging = true; });
@@ -4450,7 +4419,6 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     });
     v.addEventListener("error", () => {
       if (!v.getAttribute("src")) return;
-      audit("video.error", "Could not play video “" + (it.name || "file") + "”", {imageId:it.id, imageName:it.name, status:"failed"});
       slide.dataset.kind = "video-error"; delete slide.dataset.vpath;
       slide.replaceChildren(h("div", {class:"vposter"}, h("div", {class:"vover"}, icon("video"),
         h("div", {class:"vhint", text:"This browser can't play this video. Use Download instead."}))));
@@ -5062,7 +5030,7 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     return entry;
   }
 
-  // ---------- audit log: every action, who did it, from where ----------
+  // ---------- scoped audit log: security, transfers and owner changes ----------
   // Recorded on this device, committed to audit.json in the data repo, and mirrored to the webhook.
   const AUDIT_KINDS = {
     "image.upload":{group:"files", icon:"plus", label:"Upload"},
@@ -5167,7 +5135,14 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     writeLocal(auditKey(scope), entries);
     if (archive) logStore.importEntries(scope, "audit", entries).then(checkLogStorage).catch(() => {});
   }
+  // Shared-link recipients generate only access/security and transfer records;
+  // never log passive browsing or client preferences, even if a future caller asks.
+  const RECEIVER_AUDIT_KINDS = new Set([
+    "share.open", "share.error", "login.success", "login.failed",
+    "download.file", "download.zip", "image.upload"
+  ]);
   function audit(kind, msg, extra = {}){
+    if (shareMode && !RECEIVER_AUDIT_KINDS.has(kind)) return null;
     try {
       const scope = activityScope(), tele = {...deviceTelemetry(), ...(lastTelemetry || {}), ...(extra.telemetry || {})};
       const entry = cleanAudit({
@@ -5390,7 +5365,7 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
             extra ? h("div", {class:"audit-meta", text:extra}) : null)),
         h("time", {datetime:date.toISOString(), title:date.toLocaleString(), text:fmtWhen(e.t)})));
     }
-    if (!kids.length) kids.push(h("p", {class:"hint", text:all.length ? "No audit events match these filters." : "Nothing recorded yet. Every upload, edit, login, view, download, share and settings change will appear here."}));
+    if (!kids.length) kids.push(h("p", {class:"hint", text:all.length ? "No audit events match these filters." : "Nothing recorded yet. Security-relevant link access, downloads and uploads, plus owner library changes, appear here. Routine browsing is not tracked."}));
     box.replaceChildren(...kids);
     $("#auSync").disabled = !canEdit;
     $("#auClear").disabled = rows.length === 0;
@@ -5400,11 +5375,13 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     if (!auditClearArmed) $("#auClear").textContent = "Clear view";
   }
   function openAudit(){
+    if (!canEdit || shareMode) return;
     $("#auSearch").value = ""; $("#auFilter").value = "all";
     auditClearArmed = false; auditRowsShown = 100; clearTimeout(auditClearTimer);
     renderAuditSheet(); openTop("#auditSheet");
   }
   function clearAudit(){
+    if (!canEdit || shareMode) return;
     if (!auditClearArmed){
       auditClearArmed = true; $("#auClear").textContent = "Confirm clear view";
       auditClearTimer = setTimeout(() => { auditClearArmed = false; renderAuditSheet(); }, 5000);
@@ -5417,6 +5394,7 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     toast("View cleared. Full history and pending deliveries are kept; use Show full history to see them.");
   }
   function exportAudit(ext){
+    if (!canEdit || shareMode) return;
     const rows = loadAudit();
     if (!rows.length){ toast("Nothing to export yet."); return; }
     let blob, name = "visuals-audit-" + stampNow() + "." + ext;
@@ -5472,7 +5450,7 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     $("#anStats").replaceChildren(
       h("div", {class:"stat"}, h("b", {text:String(a.visitors.length)}), h("span", {text:"visitor logins"})),
       h("div", {class:"stat"}, h("b", {text:String(a.unique)}), h("span", {text:"unique visitors"})),
-      h("div", {class:"stat"}, h("b", {text:String(a.views.length)}), h("span", {text:"file views"})),
+      h("div", {class:"stat"}, h("b", {text:String(a.views.length)}), h("span", {text:"archived file views"})),
       h("div", {class:"stat"}, h("b", {text:String(a.downloads.length)}), h("span", {text:"downloads"})),
       h("div", {class:"stat"}, h("b", {text:String(a.uploads.length)}), h("span", {text:"uploads"})),
       h("div", {class:"stat"}, h("b", {text:a.views.length ? fmtTime(Math.round(totalDwell / a.views.length / 1000)) : "—"}), h("span", {text:"average time per view"}))
@@ -5484,7 +5462,7 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     $("#anBarsLabels").replaceChildren(...a.perDay.map((d, i) => h("span", {text:i % 3 === 0 ? d.label : ""})));
     const topBox = $("#anTop");
     if (!a.top.length){
-      topBox.replaceChildren(h("div", {class:"activity-empty", text:"No file views recorded yet. Views are counted when somebody opens an image or video in the viewer, with the time they spent on it."}));
+      topBox.replaceChildren(h("div", {class:"activity-empty", text:"No archived file-view events. New shared-link browsing is intentionally not tracked; older view records remain available in the audit archive."}));
     } else {
       const alive = a.top.filter((t) => t.id && find(t.id));
       topBox.replaceChildren(...a.top.map((t) => {
@@ -5525,6 +5503,7 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     }
   }
   function openAnalytics(){
+    if (!canEdit || shareMode) return;
     renderAnalyticsSheet(); openTop("#analyticsSheet");
   }
 
@@ -5629,8 +5608,8 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
         ? "Using the read-only token saved in Settings for " + cfg.owner + "/" + cfg.repo + ". The same token is available to every folder."
         : "Add and confirm a separate read-only token in Settings once before sharing any folder.";
     $("#fShareWebhookStatus").textContent = cfg.webhookUrl
-      ? "Every recorded visit and action inherits the webhook saved in Settings. Unconfirmed deliveries are kept and retried, including after reload."
-      : "No webhook set. Receiver activity stays on their device. Add one in Settings to receive every recorded visit and action remotely.";
+      ? "Link access attempts, downloads and uploads inherit the webhook saved in Settings. Browsing such as opening files, filtering and searching is not tracked. Unconfirmed deliveries are kept and retried, including after reload."
+      : "No webhook set. Receiver access and transfer records stay on their device. Add one in Settings to receive link visits, access attempts, downloads and uploads.";
     $("#fShareSettings").disabled = shareBusy || state.uploading || zipBusy || connecting;
     const passOk = !usePass || pass.length >= 6;
     const tokenOk = write ? !!cfg.token : !!token && !shareTokenError(token) && cfg.readTokenConfirmed;
@@ -5909,7 +5888,7 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     const el = $("#secWebhookMsg"); el.textContent = text; el.className = "formmsg" + (bad ? " bad" : "");
   }
   function openSecurity(){
-    if (!canEdit && !shareMode) return;
+    if (!canEdit || shareMode) return;
     $("#secRevokeAll").disabled = !canEdit;
     $("#secLogRefresh").disabled = !canEdit;
     $("#secLogClear").disabled = !canEdit && !shareMode;
@@ -6020,6 +5999,7 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     }
   }
   function revokeShareLink(linkId){
+    if (!canEdit || shareMode) return;
     const item = (state.shareLinks || []).find((s) => s.id === linkId);
     if (!item) return;
     item.revoked = true;
@@ -6029,6 +6009,7 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     toast("Shared link revoked. Anyone opening it will be blocked once synced.");
   }
   function revokeAllShareLinks(){
+    if (!canEdit || shareMode) return;
     state.shareRevokedBefore = Date.now();
     for (const s of (state.shareLinks || [])) s.revoked = true;
     scheduleSave();
@@ -6037,7 +6018,7 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     toast("All existing shared links have been revoked.");
   }
   async function saveDevicePassword(){
-    if ($("#secLockSave").disabled) return;
+    if (!canEdit || shareMode || $("#secLockSave").disabled) return;
     const pass = $("#secLockPass").value;
     if (!pass || pass.length < 4){ secPassMsg("Enter a password of at least 4 characters.", true); return; }
     if (!cfg.token && !state.demo){ secPassMsg("Connect your repository before setting a device password.", true); return; }
@@ -6058,6 +6039,7 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     } finally { finish(); $("#secLockSave").disabled = false; }
   }
   function removeDevicePassword(){
+    if (!canEdit || shareMode) return;
     cfg.locked = false;
     cfg.encryptedToken = null;
     deviceLocked = false; deviceLockKey = null;
@@ -6068,6 +6050,7 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     renderSecuritySheet();
   }
   function lockAppNow(){
+    if (!canEdit || shareMode) return;
     if (!cfg.locked || !cfg.encryptedToken){
       openSecurity();
       toast("Set an App Lock password first to lock this device.");
@@ -6095,7 +6078,7 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
       state.auditWebhook = {v:1, url, updatedAt:Date.now()};
       saveCfg(); scheduleSave();
       const ok = await flushSave();
-      secWebhookMsg(ok ? (url ? "Webhook saved for every shared link. Every recorded receiver action is queued for this endpoint." : "Webhook cleared for future visits. Existing queued deliveries keep their original destination.")
+      secWebhookMsg(ok ? (url ? "Webhook saved for every shared link. Link access attempts, downloads and uploads are queued for this endpoint." : "Webhook cleared for future visits. Existing queued deliveries keep their original destination.")
         : "Saved on this device, but the repository setting could not be published. Retry library sync; recipients cannot receive the update yet.", !ok);
       audit("security.change", url ? "Saved the shared activity webhook in Settings" : "Cleared the shared activity webhook in Settings", {status:ok ? "success" : "pending"});
       updateSharingState(); updateWebhookDeliveryStatus();
@@ -6117,6 +6100,7 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     } finally { $("#secWebhookTest").disabled = false; updateWebhookDeliveryStatus(); }
   }
   function exportLoginsJson(){
+    if (!canEdit || shareMode) return;
     const logs = loadLoginLogs();
     const blob = new Blob([JSON.stringify(logs, null, 2)], {type:"application/json"});
     const a = document.createElement("a");
@@ -6132,6 +6116,7 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     return '"' + (/^\s*[=+@-]/.test(text) ? "'" : "") + text.replace(/"/g, '""') + '"';
   }
   function exportLoginsCsv(){
+    if (!canEdit || shareMode) return;
     const logs = loadLoginLogs();
     const cols = ["id", "iso", "repo", "sessionId", "status", "mode", "user", "note", "folderId", "folder", "linkId", "ip", "location", "isp", "platform", "screen", "tz", "lang", "ref", "ua"];
     const escCsv = csvLogValue;
@@ -6146,6 +6131,7 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     audit("logs.export", "Exported " + plural(logs.length, "login record", "login records") + " as CSV", {count:logs.length});
   }
   function clearLoginLogs(){
+    if (!canEdit || shareMode) return;
     const n = loadLoginLogs().length;
     writeLocal("visuals-login-view-cleared:" + activityScope(), Date.now());
     renderSecuritySheet();
@@ -6182,7 +6168,7 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
       $("#lgNoteRow").hidden = !reqName;
       $("#lgPassRow").hidden = !hasPass;
       $("#lgOwnerResetRow").hidden = true;
-      $("#lgNotice").textContent = "Activity notice: Link visits, access attempts, folder/file views, viewing time, searches, downloads and uploads are logged for the owner with timestamps, your entered name and device details. IP and approximate location are included when available. Entries may be sent to the owner’s activity webhook; passwords and credentials are never logged.";
+      $("#lgNotice").textContent = "Activity notice: Link visits, access attempts, downloads and uploads are logged for the owner with timestamps, your entered name and device details. IP and approximate location are included when available. Normal browsing, including opening files, filtering and searching, is not tracked. Entries may be sent to the owner’s activity webhook; passwords and credentials are never logged.";
     }
     setTimeout(() => {
       if (!$("#lgVisitorRow").hidden) $("#lgVisitor").focus();
@@ -6344,7 +6330,7 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     if (canUploadNow()) add("Add images or videos", "", "plus", () => $("#file").click(), "upload new");
     if (canEdit) add("New folder", "", "folderplus", () => openFolderSheet({mode:"new", parent:state.folder}), "create");
     if (fold && canEdit) add("Share this folder", "", "share", () => openFolderShare(fold.id), "link");
-    add("Search my library", "/", "search", () => { closePalette(); $("#q").focus(); });
+    add(shareMode ? "Search this shared folder" : "Search my library", "/", "search", () => { closePalette(); $("#q").focus(); });
     add("Favorites", "", "heart", () => { state.fav = true; render(); }, "liked");
     add("Videos", "", "video", () => { state.vid = true; render(); }, "movies");
     add("Geotagged files", "", "info", () => { state.geo = true; render(); }, "gps map");
@@ -6353,11 +6339,13 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     if (canEdit && !isFiltering()) add("Reorder files", "", "grip", () => { state.reorder = true; state.sort = "manual"; render(); }, "custom order");
     if (state.loaded && !state.error && (!shareMode || shareAllowDl)) add("Download this folder as .zip", "", "download", () => { if (state.folder) zipFolder(state.folder); }, "export");
     if (canEdit) add("Download a full backup (.zip)", "", "download", () => backupAll(), "export backup");
-    if (canEdit) add("Recent activity", "", "activity", () => openActivity());
-    add("Audit log", "", "shield", () => openAudit(), "history everything events");
-    add("Sharing analytics", "", "activity", () => openAnalytics(), "views visitors stats");
-    if (canEdit || shareMode) add("Security & login logs", "", "lock", () => openSecurity(), "passwords visitors");
-    if (canEdit) add("Trash", "", "trash", () => openTrash(), "restore deleted");
+    if (canEdit){
+      add("Recent activity", "", "activity", () => openActivity());
+      add("Audit log", "", "shield", () => openAudit(), "history everything events");
+      add("Sharing analytics", "", "activity", () => openAnalytics(), "views visitors stats");
+      add("Security & login logs", "", "lock", () => openSecurity(), "passwords visitors");
+      add("Trash", "", "trash", () => openTrash(), "restore deleted");
+    }
     if (repoWriter()) add("Sync now", "", "activity", () => { if (readOfflineQueue()) flushOfflineNow(); else flushSave(); }, "save retry");
     if (canEdit && cfg.locked) add("Lock app now", "", "lock", () => lockAppNow());
     add("Theme: Auto (device)", "", "auto", () => setTheme("system"));
@@ -6378,7 +6366,10 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     paletteRows = paletteRows.slice(0, 40);
     if (paletteIndex >= paletteRows.length) paletteIndex = Math.max(0, paletteRows.length - 1);
     const list = $("#palList");
-    if (!paletteRows.length){ list.replaceChildren(h("p", {class:"palette-empty", text:"No command matches “" + q + "”. Try a folder name, “audit”, “theme” or “zip”."})); return; }
+    if (!paletteRows.length){
+      const hint = canEdit ? "Try a folder name, “audit”, “theme” or “zip”" : "Try a folder name, “theme” or “zip”";
+      list.replaceChildren(h("p", {class:"palette-empty", text:"No command matches “" + q + "”. " + hint + "."})); return;
+    }
     list.replaceChildren(...paletteRows.map((c, i) => h("button", {class:"palette-item", type:"button", role:"option", "aria-selected":String(i === paletteIndex),
       onclick:() => runPalette(i)}, icon(c.iconName), h("span", {text:c.label}), c.hint ? h("small", {text:c.hint}) : null)));
   }
@@ -6425,53 +6416,24 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
   }
 
   // ---------- receiver navigation and page lifecycle ----------
-  let searchActivityTimer = 0, lastSearchActivity = "", shareHidden = false, shareLeaveLogged = false;
-  function queueSearchActivity(){
-    if (!shareMode || shareLocked || state.error) return;
-    clearTimeout(searchActivityTimer);
-    searchActivityTimer = setTimeout(flushSearchActivity, 500);
-  }
-  function flushSearchActivity(){
-    clearTimeout(searchActivityTimer); searchActivityTimer = 0;
-    if (!shareMode || shareLocked || state.error || state.q === lastSearchActivity) return;
-    lastSearchActivity = state.q;
-    audit("search.query", state.q ? "Searched shared folder for “" + state.q + "”" : "Cleared the shared-folder search", {count:visible().length});
-  }
-  function logVisitorFilter(label, enabled){
-    if (shareMode && !shareLocked && !state.error) audit("view.filter", (enabled ? "Enabled " : "Disabled ") + label + " filter", {count:visible().length});
-  }
+  // Browsing is intentionally private: only access/security and transfer outcomes
+  // are recorded. Lifecycle events merely flush already-pending critical events.
   document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "hidden"){
-      flushSearchActivity(); flushViewerDwell("tab_hidden");
-      if (shareMode && shareEntryLogged && !shareHidden){ shareHidden = true; audit("share.hidden", "Shared-link tab moved to the background"); }
       if (!state.demo) webhookDispatcher.flush({keepalive:true}).catch(() => {});
-    } else {
-      if (shareMode && shareHidden){ shareHidden = false; audit("share.resume", "Returned to the shared-link tab"); }
-      if (viewer.open && !viewerDwellId){ viewerDwellId = viewer.ids[viewer.idx]; viewerSince = Date.now(); }
-      if (!state.demo) webhookDispatcher.schedule();
-    }
+    } else if (!state.demo) webhookDispatcher.schedule();
   });
   window.addEventListener("pagehide", () => {
-    flushSearchActivity(); flushViewerDwell("page_exit");
-    if (shareMode && shareEntryLogged && !shareLeaveLogged){
-      shareLeaveLogged = true;
-      audit("share.leave", "Left the shared-link page", {ms:Math.max(0, Date.now() - shareSessionStarted), status:shareLocked ? "locked" : "success"});
-    }
     if (!state.demo) webhookDispatcher.flush({keepalive:true}).catch(() => {});
   });
-  window.addEventListener("pageshow", (e) => {
-    if (e.persisted && shareMode){ shareLeaveLogged = false; audit("share.resume", "Restored the shared-link page"); }
+  window.addEventListener("pageshow", () => {
     if (!state.demo) webhookDispatcher.schedule();
   });
   window.addEventListener("online", () => {
-    if (shareMode) audit("app.online", "Receiver device came online");
     if (!state.demo) webhookDispatcher.schedule(0);
     if (canEdit && auditSyncedVersion < auditSyncVersion) scheduleAuditSync();
   });
-  window.addEventListener("offline", () => {
-    if (shareMode) audit("app.offline", "Receiver device went offline");
-    updateWebhookDeliveryStatus();
-  });
+  window.addEventListener("offline", updateWebhookDeliveryStatus);
 
   // ---------- wiring ----------
   applyTheme(themeChoice());
@@ -6494,12 +6456,9 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
   for (const id of ["#upClose", "#dClose", "#sClose", "#fClose", "#mClose", "#aClose", "#btClose", "#secClose", "#auClose", "#anClose", "#trClose", "#ksClose", "#edClose", "#coClose", "#ctClose"]) $(id).replaceChildren(icon("close"));
   for (const w of document.querySelectorAll(".selwrap")) w.append(icon("chev"));
 
-  $("#q").addEventListener("input", (e) => { state.q = e.target.value; render(); queueSearchActivity(); });
-  $("#q").addEventListener("change", flushSearchActivity);
-  $("#q").addEventListener("search", flushSearchActivity);
-  $("#q").addEventListener("keydown", (e) => { if (e.key === "Enter") flushSearchActivity(); });
-  $("#sortSel").addEventListener("change", (e) => { cancelDrag(); state.reorder = false; state.sort = e.target.value; saveView(); render(); if (shareMode) audit("view.sort", "Changed file sort order to " + state.sort); });
-  $("#folderSortSel").addEventListener("change", (e) => { state.folderSort = e.target.value; saveView(); render(); if (shareMode) audit("view.sort", "Changed folder sort order to " + state.folderSort); });
+  $("#q").addEventListener("input", (e) => { state.q = e.target.value; render(); });
+  $("#sortSel").addEventListener("change", (e) => { cancelDrag(); state.reorder = false; state.sort = e.target.value; saveView(); render(); });
+  $("#folderSortSel").addEventListener("change", (e) => { state.folderSort = e.target.value; saveView(); render(); });
   $("#reorderBtn").addEventListener("click", () => {
     if (isFiltering()) return;
     cancelDrag(); state.reorder = !state.reorder;
@@ -6529,8 +6488,12 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
   });
   $("#secWebhookSave").addEventListener("click", saveWebhookConfig);
   $("#secWebhookTest").addEventListener("click", testWebhookConfig);
-  $("#secWebhookRetry").addEventListener("click", () => { webhookDispatcher.retry(activityScope()).catch(() => {}); audit("webhook.retry", "Retried pending activity deliveries"); });
+  $("#secWebhookRetry").addEventListener("click", () => {
+    if (!canEdit || shareMode) return;
+    webhookDispatcher.retry(activityScope()).catch(() => {}); audit("webhook.retry", "Retried pending activity deliveries");
+  });
   $("#secWebhookExport").addEventListener("click", async () => {
+    if (!canEdit || shareMode) return;
     const attempts = await logStore.attempts(activityScope());
     downloadBlob(new Blob([JSON.stringify(attempts, null, 2)], {type:"application/json"}), "visuals-webhook-deliveries-" + stampNow() + ".json");
     audit("logs.export", "Exported webhook delivery history", {count:attempts.length});
@@ -6797,7 +6760,7 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     };
     state.loaded = false; state.error = null;
     try {
-      banner(shareMode ? "Activity notice: link visits and actions are logged for the folder owner and may be sent to their activity webhook." : ""); render();
+      banner(shareMode ? "Activity notice: link access attempts, downloads and uploads are logged for the folder owner and may be sent to their activity webhook. Browsing such as opening files, filtering and searching is not tracked." : ""); render();
       await hydrateActivityLogs();
       if (!current()) return;
       if (shareMode && !shareEntryLogged){
@@ -6834,8 +6797,6 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
         state.folder = findFolder(root) ? root : null;
         if (!state.folder){ fail("This shared folder or its scoped subfolder no longer exists. Ask the owner for a new link.", "missing_folder"); return; }
         bumpShareCounter("views"); applyWatermark(); applyRoute();
-        audit("share.ready", "Opened shared folder “" + folderPath(state.folder) + "”", {note:linkMode});
-        audit("view.folder", "Viewed folder “" + folderPath(state.folder) + "”", {count:visible().length});
         if (!shareAccessLogged){
           shareAccessLogged = true;
           recordLoginEvent({status:"success", mode:"share_link", user:shareVisitorName || "Visitor", note:shareAccessNote,
@@ -6844,7 +6805,7 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
         banner("Shared folder" + (shareVisitorName ? " · signed in as " + shareVisitorName : "")
           + (linkMode === "view" ? " · view-only (downloads disabled)." : linkMode === "write" ? " · you can view, download and add files (no delete)." : " · view and download.")
           + (shareWatermark ? " · watermarked." : "") + shareLimitSummary()
-          + " · Activity notice: visits, views, searches, downloads and uploads are logged for the owner"
+          + " · Activity notice: link access, downloads and uploads are logged for the owner; file opens, filters and searches are not tracked"
           + (auditWebhookUrl() ? " and sent to their activity webhook." : "."));
       } else {
         applyRoute();
