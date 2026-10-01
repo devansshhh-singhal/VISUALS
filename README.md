@@ -155,6 +155,12 @@ mandatory, authoritative access auditing requires a server-side access/collectio
   re-uploads a file.
 - **Smart folders**: built-in Favorites, Videos, Geotagged and Recently added views plus
   saved searches ("Save this search") stored with the library.
+- **People**: optional on-device face grouping. Scanning runs in the browser with the
+  bundled face-api models (`vendor/face-api.js`, `models/`). A numeric signature for
+  each face is saved in private `faces.json`, not in `library.json` and not in share
+  links. Name, merge, hide or forget a person without deleting photos. Match a photo
+  or a camera still stays on this device and is not uploaded. Autoscan of new uploads
+  is off until you turn it on in People. Share-link visitors are not shown People.
 - **Storage check**: Settings lists what the repository actually stores, flags orphaned
   previews or archived versions, and can delete them (with a second confirming tap).
 - **Large libraries**: the grid renders in batches of 60 as you scroll, uses tiny blurred

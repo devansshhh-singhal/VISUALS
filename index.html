@@ -29,6 +29,10 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 
+Face recognition (loaded only when you scan or match faces) uses
+@vladmandic/face-api 1.7.15, MIT, which bundles TensorFlow.js (Apache-2.0).
+Model notices are in models/NOTICE.txt. Photos are not sent to a face service.
+
 Bundled pako:
 (The MIT License)
 
@@ -476,6 +480,23 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
 .limit-note{font-size:12px;color:var(--muted);margin:8px 0 0}
 .limits-used{font-size:12px;color:var(--muted);font-weight:700}
 
+/* People albums: circular crops use the same aspect ratio as the photo. */
+.people-row{display:flex;gap:14px;overflow-x:auto;padding:4px 2px 12px;scroll-snap-type:x proximity}
+.person-card{display:flex;flex-direction:column;align-items:center;gap:4px;width:96px;flex:none;scroll-snap-align:start}
+.person-tile{display:flex;flex-direction:column;align-items:center;gap:6px;width:96px;border:0;background:none;padding:0;font:inherit;color:var(--text);cursor:pointer}
+.person-tile .pname{font-size:13px;font-weight:800;max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.person-tile .psub{font-size:12px;color:var(--muted);font-weight:700}
+.person-edit{font-size:12px;min-height:28px}
+.face-crop{position:relative;border-radius:50%;overflow:hidden;box-shadow:var(--raise-sm);background:var(--bg);flex:none}
+.face-crop img{position:absolute;max-width:none;max-height:none;width:calc(100% / var(--fw));height:calc(100% / var(--fh));left:calc(var(--fx) * -100% / var(--fw));top:calc(var(--fy) * -100% / var(--fh))}
+.face-stage{position:relative;display:inline-grid;max-width:100%;max-height:100%;min-width:0;min-height:0}
+.face-stage img{display:block;max-width:100%;max-height:100%}
+.face-boxes{position:absolute;inset:0}
+.face-boxes button{position:absolute;border:2px solid #fff;border-radius:10px;background:transparent;box-shadow:0 0 0 1px rgba(0,0,0,.4);padding:0;min-width:0}
+.face-boxes button span{position:absolute;left:0;bottom:calc(100% + 4px);max-width:140px;overflow:hidden;text-overflow:ellipsis;background:var(--bg);color:var(--text);font-size:11px;font-weight:800;padding:2px 7px;border-radius:999px;white-space:nowrap;box-shadow:var(--raise-sm)}
+.face-match{display:flex;gap:12px;align-items:center}
+.face-match p{margin:0}
+
 /* Collections, smart folders and saved searches */
 .collection-tile,.smart-chip{cursor:pointer}
 .collection-tile .open{position:relative}
@@ -650,7 +671,7 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
   <label class="search">
     <span class="sr">Search your visuals</span>
     <span class="ico" id="searchIco"></span>
-    <input id="q" type="search" placeholder="Search by name, tag or folder" autocomplete="off" enterkeyhint="search">
+    <input id="q" type="search" placeholder="Search by name, tag, folder or person" autocomplete="off" enterkeyhint="search">
   </label>
 
   <section id="foldersSec" hidden>
@@ -665,6 +686,15 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     </div>
     <p id="folderHint" class="hintline" hidden>Organize your library with folders and subfolders. Move files without uploading them again.</p>
     <div id="folderGrid" class="grid"></div>
+  </section>
+
+  <section id="peopleSec" hidden>
+    <div class="secthead">
+      <h2 id="peopleTitle">People</h2>
+      <button class="btn small" id="peopleManage" type="button">Scan faces</button>
+    </div>
+    <p id="peopleHint" class="hintline">Find the same person across your photos. Recognition runs on this device — photos are not sent to a face service.</p>
+    <div id="peopleRow" class="people-row" hidden></div>
   </section>
 
   <section id="collectionsSec" hidden>
@@ -775,8 +805,13 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     <h2 id="dTitle">Details</h2>
     <button class="round" id="dClose" type="button" aria-label="Close"></button>
   </div>
-  <div class="preview"><img id="dImg" alt=""></div>
+  <div class="preview"><div class="face-stage"><img id="dImg" alt=""><div id="dFaceBoxes" class="face-boxes" hidden></div></div></div>
   <p id="dExif" class="exif-line" hidden></p>
+  <div id="dFacesBlock" class="field" hidden>
+    <span class="lbl">People in this photo</span>
+    <div id="dFaces" class="people-row"></div>
+    <button class="btn small" id="dFaceScan" type="button">Scan this photo</button>
+  </div>
   <label class="field">
     <span class="lbl">Name</span>
     <input id="dName" type="text" maxlength="80" autocomplete="off" enterkeyhint="done">
@@ -884,6 +919,14 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     </div>
   </div>
 
+  <div class="sec-section" id="sFacesSection">
+    <h3>Face recognition</h3>
+    <p class="hint" style="margin:0 0 10px">Group photos of the same person. Detection and matching run on this device. A numeric face signature is saved in your private repository as <code>faces.json</code> so your other devices can keep the same groups. Share-link visitors are not shown People, and this app does not send them that file.</p>
+    <div class="sec-actions">
+      <button class="btn small" id="sFaces" type="button">Open People</button>
+    </div>
+  </div>
+
   <div class="sec-section" id="sAuditSection">
     <h3>Audit &amp; insight</h3>
     <p class="hint" style="margin:0 0 10px">Security-relevant link access, downloads and uploads are recorded, along with owner changes. Routine browsing — opening files, filtering, searching and playback — is not tracked.</p>
@@ -898,7 +941,7 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
   <details class="info">
     <summary>Where do my images go?</summary>
     <p>Into your private repo, never the public one. Every image is saved as a commit there.</p>
-    <p><code>images/</code> holds the full-size files. <code>thumbs/</code> holds small previews so the grid loads fast. <code>library.json</code> holds names, tags, favorites and folders.</p>
+    <p><code>images/</code> holds the full-size files. <code>thumbs/</code> holds small previews so the grid loads fast. <code>library.json</code> holds names, tags, favorites and folders. <code>faces.json</code> holds optional face signatures if you use People.</p>
     <p>Folders, subfolders, tags, favorites and custom order live in <code>library.json</code>. Organizing files never re-uploads them.</p>
     <p>A full backup includes all library files, previews, metadata and login logs. Your token is never included. Git history and unrelated repository files are not part of a library backup.</p>
   </details>
@@ -1305,6 +1348,55 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
   <div id="ctList" class="picklist"></div>
 </section>
 
+<section id="peopleSheet" class="sheet top" role="dialog" aria-modal="true" aria-labelledby="peTitle" hidden>
+  <div class="sheethead">
+    <h2 id="peTitle">People</h2>
+    <button class="round" id="peClose" type="button" aria-label="Close"></button>
+  </div>
+  <p class="hint" style="margin-top:0">Face recognition runs on this device. Photos are not uploaded to a recognition service. Each face keeps a numeric signature in your private <code>faces.json</code> so another device you connect can group the same people. Share links do not open People. Names can be wrong — check them, then rename, merge or forget anyone you like. Forgetting removes the grouping only; the photos stay.</p>
+  <p id="peStatus" class="hint" role="status" style="margin:0 0 10px"></p>
+  <div class="sec-actions" style="margin:0 0 12px">
+    <button class="btn small" id="peScan" type="button">Scan new photos</button>
+    <button class="btn small" id="peScanAll" type="button">Scan again</button>
+    <button class="btn small" id="peCancel" type="button" hidden>Stop</button>
+    <button class="btn small" id="peMatch" type="button">Match a photo</button>
+    <button class="btn small" id="peCamera" type="button">Take a photo</button>
+    <button class="btn small danger" id="peForget" type="button" hidden>Forget all faces</button>
+  </div>
+  <label class="check"><input id="peAuto" type="checkbox">Scan new uploads on this device</label>
+  <label class="check" id="peHiddenRow"><input id="peShowHidden" type="checkbox">Show hidden people</label>
+  <div id="peMatchOut" class="picklist" hidden></div>
+  <div id="peList" class="picklist"></div>
+  <input id="peFile" type="file" accept="image/png,image/jpeg,image/gif,image/webp,image/avif,.png,.jpg,.jpeg,.gif,.webp,.avif" hidden>
+  <input id="peCam" type="file" accept="image/*" capture="environment" hidden>
+</section>
+
+<section id="personSheet" class="sheet top" role="dialog" aria-modal="true" aria-labelledby="psTitle" hidden>
+  <div class="sheethead">
+    <h2 id="psTitle">Person</h2>
+    <button class="round" id="psClose" type="button" aria-label="Close"></button>
+  </div>
+  <label class="field" style="margin-top:6px">
+    <span class="lbl">Name</span>
+    <input id="psName" type="text" maxlength="60" autocomplete="off" enterkeyhint="done" placeholder="e.g. Alex">
+  </label>
+  <p id="psMeta" class="hint" style="margin:0 0 8px"></p>
+  <div id="psFaces" class="people-row"></div>
+  <label class="field" id="psMergeRow">
+    <span class="lbl">Merge into</span>
+    <span class="selwrap"><select id="psMerge" aria-label="Person to merge into"></select></span>
+  </label>
+  <div id="psMsg" class="formmsg" role="status"></div>
+  <div class="actions" style="margin-top:14px">
+    <button class="btn" id="psSave" type="button">Save name</button>
+    <button class="btn" id="psMergeGo" type="button">Merge</button>
+    <button class="btn" id="psOpen" type="button">Show photos</button>
+    <button class="btn" id="psHide" type="button">Hide</button>
+    <button class="btn danger" id="psForget" type="button">Forget this person</button>
+  </div>
+  <p class="hint">“Not this person” on a face starts a new group and keeps that correction if you scan again.</p>
+</section>
+
 <section id="editorSheet" class="sheet top" role="dialog" aria-modal="true" aria-labelledby="edTitle" hidden>
   <div class="sheethead">
     <h2 id="edTitle">Edit image</h2>
@@ -1359,6 +1451,7 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
 <script src="activity-log.js"></script>
+<script src="faces.js"></script>
 <script>
 (() => {
   const $ = (s) => document.querySelector(s);
@@ -1393,6 +1486,7 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     unlock:`<svg viewBox="0 0 24 24" ${P}><rect x="5" y="11" width="14" height="10" rx="3"/><path d="M8 11V7a4 4 0 0 1 7.4-2"/></svg>`,
     shield:`<svg viewBox="0 0 24 24" ${P}><path d="M12 3l7 3v6c0 5-3.5 8.2-7 9-3.5-.8-7-4-7-9V6z"/><path d="M9 12l2 2 4-4"/></svg>`,
     user:`<svg viewBox="0 0 24 24" ${P}><circle cx="12" cy="8" r="4"/><path d="M4 20c1.8-3.8 5-6 8-6s6.2 2.2 8 6"/></svg>`,
+    faces:`<svg viewBox="0 0 24 24" ${P}><circle cx="12" cy="12" r="9"/><path d="M9 10h.01M15 10h.01M8.5 14.5c1.1 1.3 2.2 2 3.5 2s2.4-.7 3.5-2"/></svg>`,
     sun:`<svg viewBox="0 0 24 24" ${P}><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.6 4.6L6.7 6.7M17.3 17.3l2.1 2.1M19.4 4.6l-2.1 2.1M6.7 17.3l-2.1 2.1"/></svg>`,
     moon:`<svg viewBox="0 0 24 24" ${P}><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5z"/></svg>`,
     auto:`<svg viewBox="0 0 24 24" ${P}><rect x="3" y="5" width="18" height="12" rx="3"/><path d="M9 20h6"/></svg>`,
@@ -1700,6 +1794,7 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
 
   const state = {
     items:[], folders:[], trash:[], shareLinks:[], shareRevokedBefore:0, auditWebhook:null, collections:[], smart:[],
+    people:[], faces:[], faceScans:[], facesSha:null, personId:"",
     folder:null, collectionId:"", smartId:"", tag:null, fav:false, vid:false, q:"", geo:false, loaded:false, error:null,
     openId:null, pending:[], uploading:false, sha:null, sync:"saved", select:false, sel:new Set(), sort:"date-desc",
     folderSort:"name-asc", reorder:false, gridShown:60, gridSig:"", demo:location.hash === "#demo",
@@ -2416,30 +2511,42 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
   }
 
   window.addEventListener("beforeunload", (e) => {
-    if (!state.demo && (state.sync === "pending" || state.sync === "saving" || state.uploading || pendingDel.length || zipBusy)){ e.preventDefault(); e.returnValue = ""; }
+    if (!state.demo && (state.sync === "pending" || state.sync === "saving" || state.uploading || pendingDel.length || zipBusy || facesDirty())){ e.preventDefault(); e.returnValue = ""; }
   });
 
   // ---------- navigation ----------
   function applyRoute(){
     let id = null;
-    if (shareMode) id = history.state?.sharedFolder || shareRootFolder();
-    else if (state.demo) id = history.state?.demoFolder || null;
+    if (shareMode){ state.personId = ""; id = history.state?.sharedFolder || shareRootFolder(); }
+    else if (state.demo){
+      id = history.state?.demoFolder || null;
+      const pid = history.state?.demoPerson || "";
+      state.personId = (state.people || []).some((p) => p.id === pid) ? pid : "";
+      if (state.personId) id = null;
+    }
     else {
-      const m = /^#f=(.+)$/.exec(location.hash), mc = /^#c=(.+)$/.exec(location.hash), ms = /^#s=(.+)$/.exec(location.hash);
+      const m = /^#f=(.+)$/.exec(location.hash), mc = /^#c=(.+)$/.exec(location.hash), ms = /^#s=(.+)$/.exec(location.hash), mp = /^#p=(.+)$/.exec(location.hash);
       try { id = m ? decodeURIComponent(m[1]) : null; } catch (e) {}
-      let cid = "", sid = "";
+      let cid = "", sid = "", pid = "";
       try { cid = mc ? decodeURIComponent(mc[1]) : ""; } catch (e) {}
       try { sid = ms ? decodeURIComponent(ms[1]) : ""; } catch (e) {}
+      try { pid = mp ? decodeURIComponent(mp[1]) : ""; } catch (e) {}
+      const person = pid && (state.people || []).find((p) => p.id === pid);
       const col = cid && (state.collections || []).find((c) => c.id === cid), sm = sid && ((state.smart || []).find((x) => x.id === sid) || SMART_BUILTINS.find((x) => x.id === sid));
-      if (col || sm){
-        if (col){ state.collectionId = col.id; state.smartId = ""; }
-        else {
-          const q = sm.query || {};
-          state.smartId = sm.id; state.collectionId = "";
-          state.q = q.q || ""; $("#q").value = state.q;
-          state.tag = q.tag || null; state.fav = !!q.fav; state.vid = !!q.vid; state.geo = !!q.geo;
-        }
-      } else { state.collectionId = ""; state.smartId = ""; }
+      if (person){
+        state.personId = person.id; state.collectionId = ""; state.smartId = ""; id = null;
+      } else {
+        state.personId = "";
+        if (col || sm){
+          if (col){ state.collectionId = col.id; state.smartId = ""; }
+          else {
+            const q = sm.query || {};
+            state.smartId = sm.id; state.collectionId = "";
+            state.q = q.q || ""; $("#q").value = state.q;
+            state.tag = q.tag || null; state.fav = !!q.fav; state.vid = !!q.vid; state.geo = !!q.geo;
+          }
+        } else { state.collectionId = ""; state.smartId = ""; }
+      }
     }
     id = findFolder(id) ? id : null;
     if (shareMode && !id) id = findFolder(shareFolderId) ? shareFolderId : null;
@@ -2452,7 +2559,7 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
   }
   function navigate(id){
     id = findFolder(id) ? id : null;
-    state.collectionId = ""; state.smartId = "";
+    state.collectionId = ""; state.smartId = ""; state.personId = "";
     if (shareMode && !id) id = findFolder(shareRootFolder()) ? shareRootFolder() : null;
     if (id === state.folder) return;
     cancelDrag(); state.reorder = false; exitSelect();
@@ -2497,15 +2604,18 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     const tokens = state.q.toLowerCase().split(/\s+/).filter(Boolean), filtering = isFiltering();
     const scope = state.folder && filtering ? descendants(state.folder) : null;
     const inCollection = !!state.collectionId, colIds = inCollection ? new Set(scopeItems().map((i) => i.id)) : null;
+    const inPerson = !!state.personId, personIds = inPerson ? new Set(itemsForPerson(state.personId)) : null;
     const list = state.items.filter((it) => {
       if (inCollection && !colIds.has(it.id)) return false;
+      if (inPerson && !personIds.has(it.id)) return false;
       if (state.folder){ if (scope ? !scope.has(it.folder) : it.folder !== state.folder) return false; }
-      else if (!filtering && !inCollection && it.folder) return false;
+      else if (!filtering && !inCollection && !inPerson && it.folder) return false;
       if (state.fav && !it.fav) return false;
       if (state.vid && !isVideo(it)) return false;
       if (state.geo && !(it.exif && it.exif.gps)) return false;
       if (state.tag && !(it.tags || []).includes(state.tag)) return false;
-      const hay = ((it.name || "") + " " + (it.tags || []).join(" ") + " " + folderPath(it.folder)).toLowerCase();
+      const names = peopleForItem(it.id).map(personLabel).join(" ");
+      const hay = ((it.name || "") + " " + (it.tags || []).join(" ") + " " + folderPath(it.folder) + " " + names).toLowerCase();
       return tokens.every((t) => hay.includes(t));
     });
     return sortList(list);
@@ -2577,7 +2687,7 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     const c = (state.collections || []).find((x) => x.id === id);
     if (!c) return;
     cancelDrag(); state.reorder = false; exitSelect();
-    state.folder = null; state.smartId = "";
+    state.folder = null; state.smartId = ""; state.personId = "";
     state.tag = null; state.fav = false; state.vid = false; state.geo = false; state.q = ""; $("#q").value = "";
     state.collectionId = id;
     try { history.pushState({collection:id}, "", "#c=" + enc(id)); } catch (e) {}
@@ -2593,7 +2703,7 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     const cfgS = saved || SMART_BUILTINS.find((x) => x.id === id);
     if (!cfgS) return;
     cancelDrag(); state.reorder = false; exitSelect();
-    state.folder = null; state.collectionId = "";
+    state.folder = null; state.collectionId = ""; state.personId = "";
     const q = cfgS.query || {};
     state.q = q.q || ""; $("#q").value = state.q;
     state.tag = q.tag || null; state.fav = !!q.fav; state.vid = !!q.vid; state.geo = !!q.geo;
@@ -2641,7 +2751,7 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
   }
   function renderCollections(){
     const sec = $("#collectionsSec"), list = state.collections || [];
-    const show = state.loaded && !state.error && !state.folder && !state.collectionId && !state.select && !state.reorder && (canEdit || list.length > 0);
+    const show = state.loaded && !state.error && !state.folder && !state.collectionId && !state.personId && !state.select && !state.reorder && (canEdit || list.length > 0);
     sec.hidden = !show; if (!show) return;
     $("#newCollection").hidden = !canEdit;
     $("#newCollection").replaceChildren(icon("plus"), "New collection");
@@ -2710,7 +2820,7 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
   }
   function renderSmart(){
     const sec = $("#smartSec"), saved = state.smart || [];
-    const show = state.loaded && !state.error && !state.folder && !state.collectionId && !state.select && !state.reorder && (saved.length > 0 || canEdit);
+    const show = state.loaded && !state.error && !state.folder && !state.collectionId && !state.personId && !state.select && !state.reorder && (saved.length > 0 || canEdit);
     sec.hidden = !show; if (!show) return;
     $("#smartChips").replaceChildren(...[...SMART_BUILTINS, ...saved].map((x) => h("button",
       {class:"chip" + (state.smartId === x.id ? " on" : ""), type:"button", "aria-pressed":String(state.smartId === x.id),
@@ -2730,20 +2840,24 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
   function renderHeader(){
     const f = findFolder(state.folder), parent = f ? findFolder(f.parent) : null;
     const col = activeCollection(), smart = activeSmart();
-    $("#back").hidden = !(f || col || smart) || (shareMode && f && f.id === shareRootFolder());
+    const person = activePerson();
+    $("#back").hidden = !(f || col || smart || person) || (shareMode && f && f.id === shareRootFolder());
     $("#back").setAttribute("aria-label", parent ? "Back to " + parent.name : "Back to library");
     $("#gear").hidden = shareMode;
     $("#lockBtn").hidden = shareMode || !canEdit || !cfg.locked;
     $("#editFolder").hidden = !(f && canEdit);
     $("#folderShareBtn").hidden = !(f && canEdit);
     document.body.classList.toggle("no-dl", shareMode && !shareAllowDl);
-    $("#title").textContent = col ? col.name : smart ? smart.name : f ? f.name : "My Visuals";
-    document.title = ((col || smart || f) ? ((col || smart || f).name) + " – " : "") + "My Visuals";
+    $("#title").textContent = person ? personLabel(person) : col ? col.name : smart ? smart.name : f ? f.name : "My Visuals";
+    document.title = ((person || col || smart || f) ? ((person ? personLabel(person) : (col || smart || f).name)) + " – " : "") + "My Visuals";
     let text;
     if (!state.loaded) text = shareMode ? "Loading shared folder…" : "Loading your library…";
     else if (state.error) text = shareMode ? "Couldn't open this shared folder" : "Couldn't load your library";
     else if (shareMode && shareLocked) text = "Sign in to open the shared folder";
     else if (deviceLocked) text = "Unlock your library to continue";
+    else if (person){
+      text = itemsLabel(itemsForPerson(person.id).map(find).filter(Boolean)) + " · person";
+    }
     else if (col){
       const list = col.items.map(find).filter(Boolean), v = list.filter(isVideo).length, parts = [itemsLabel(list)];
       parts.push("collection");
@@ -2763,11 +2877,16 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
       if (n - v) parts.push(plural(n - v, "image", "images"));
       if (v) parts.push(plural(v, "video", "videos"));
       if (k) parts.push(plural(k, "folder", "folders"));
+      const peopleN = canEdit ? (state.people || []).filter((p) => !p.hidden && itemsForPerson(p.id).length).length : 0;
+      if (peopleN) parts.push(plural(peopleN, "person", "people"));
       text = parts.length ? parts.join(" · ") : "Nothing here yet";
     }
     $("#meta").textContent = text;
-    const crumbs = $("#breadcrumbs"); crumbs.hidden = !(f || col || smart);
-    if (col || smart){
+    const crumbs = $("#breadcrumbs"); crumbs.hidden = !(f || col || smart || person);
+    if (person){
+      crumbs.replaceChildren(h("button", {type:"button", text:"Library", onclick:() => leavePerson()}),
+        icon("next"), h("span", {class:"current", "aria-current":"page", text:personLabel(person)}));
+    } else if (col || smart){
       crumbs.replaceChildren(h("button", {type:"button", text:"Library", onclick:() => { state.collectionId = ""; state.smartId = ""; state.tag = null; state.fav = false; state.vid = false; state.geo = false; state.q = ""; $("#q").value = ""; try { history.pushState({}, "", location.pathname + location.search); } catch (e) {} render(); } }),
         icon("next"), h("span", {class:"current", "aria-current":"page", text:(col || smart).name}));
     } else if (f){
@@ -2822,7 +2941,7 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
   }
   function renderFolders(){
     const sec = $("#foldersSec"), children = childFolders(state.folder);
-    const show = state.loaded && !state.error && (canEdit || shareMode) && !isFiltering() && !state.select && !state.reorder
+    const show = state.loaded && !state.error && (canEdit || shareMode) && !isFiltering() && !state.select && !state.reorder && !state.personId
       && (children.length > 0 || canEdit);
     sec.hidden = !show; if (!show) return;
     $("#foldersTitle").textContent = state.folder ? "Subfolders" : "Folders";
@@ -2862,9 +2981,9 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     const grid = $("#grid"), empty = $("#empty"), sec = $("#imagesSec");
     const list = visible();
     const filtering = isFiltering();
-    if (state.reorder && (filtering || state.select || !canEdit)) { cancelDrag(); state.reorder = false; }
+    if (state.reorder && (filtering || state.select || !canEdit || state.personId)) { cancelDrag(); state.reorder = false; }
     $("#reorderHint").hidden = !state.reorder || list.length < 2;
-    $("#reorderBtn").hidden = !canEdit || state.select || list.length < 2;
+    $("#reorderBtn").hidden = !canEdit || state.select || list.length < 2 || !!state.personId;
     $("#reorderBtn").textContent = state.reorder ? "Done" : "Reorder";
     $("#reorderBtn").disabled = filtering;
     $("#reorderBtn").title = filtering ? "Clear filters to reorder files in this folder" : "Save your own file order";
@@ -2874,7 +2993,7 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     if (list.length){
       $("#imagesTitle").textContent = state.select
         ? (state.sel.size ? itemsLabel([...state.sel].map(find).filter(Boolean)) + " selected" : "Tap to select")
-        : filtering ? "Results" : state.folder ? kindTitle(list) : (state.folders.length ? "Unfiled" : kindTitle(list));
+        : filtering ? "Results" : state.personId ? "Photos" : state.folder ? kindTitle(list) : (state.folders.length ? "Unfiled" : kindTitle(list));
       $("#selectBtn").hidden = !canEdit;
       $("#selectBtn").textContent = !state.select ? "Select" : (list.every((i) => state.sel.has(i.id)) ? "Clear" : "Select all");
       $("#sortWrap").hidden = list.length < 2;
@@ -2898,6 +3017,10 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     } else if (filtering){
       empty.replaceChildren(icon("search"), h("h2", {text:"No matches"}), h("p", {text:"Try a different word or tag."}),
         h("div", {class:"emptyrow"}, h("button", {class:"btn", type:"button", text:"Clear filters", onclick:clearFilters})));
+    } else if (state.personId){
+      empty.replaceChildren(icon("faces"), h("h2", {text:"No photos for this person"}),
+        h("p", {text:"Their grouping is still saved. Scan new photos, or forget them from People."}),
+        h("div", {class:"emptyrow"}, h("button", {class:"btn", type:"button", text:"Back to library", onclick:leavePerson})));
     } else if (state.collectionId){
       empty.replaceChildren(icon("heart"), h("h2", {text:"This collection is empty"}),
         h("p", {text:"Select files in your library, then use “Add to collection”."}),
@@ -2966,7 +3089,7 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
   }
   function render(){
     if (io) io.disconnect();
-    renderHeader(); renderFolders(); renderCollections(); renderSmart(); renderChips(); renderGrid(); renderDock(); setSync(state.sync);
+    renderHeader(); renderFolders(); renderPeople(); renderCollections(); renderSmart(); renderChips(); renderGrid(); renderDock(); setSync(state.sync);
     renderStorage(); renderZipState(); syncViewer();
   }
 
@@ -3010,7 +3133,7 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
   function closeTop(){
     $("#backdrop2").hidden = true;
     cancelShareCheck(true);
-    for (const s of ["#folderSheet", "#moveSheet", "#activitySheet", "#bulkTagsSheet", "#securitySheet", "#auditSheet", "#analyticsSheet", "#trashSheet", "#shortcutsSheet", "#editorSheet", "#collectionSheet", "#collectSheet"]) $(s).hidden = true;
+    for (const s of ["#folderSheet", "#moveSheet", "#activitySheet", "#bulkTagsSheet", "#securitySheet", "#auditSheet", "#analyticsSheet", "#trashSheet", "#shortcutsSheet", "#editorSheet", "#collectionSheet", "#collectSheet", "#peopleSheet", "#personSheet"]) $(s).hidden = true;
     resetFolderDelete();
     if ($("#backdrop").hidden && !viewer.open) document.body.classList.remove("lock");
     const c = folderCtx; folderCtx = null;
@@ -3168,6 +3291,20 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
           if (it.thumb) addTask("thumbs/" + it.thumb, "thumbs/" + it.thumb);
         }
         zip.file("library.json", JSON.stringify(snapshot, null, 2), {compression:"DEFLATE"});
+        if (canEdit && !shareMode){
+          let facesBytes = null;
+          if (facesKnown && !facesBlocked){
+            if (facesDirty()){
+              setZipStatus("Saving face groups before backup…");
+              await flushFaces();
+            }
+            facesBytes = JSON.stringify(facesSnapshot(), null, 2);
+          } else {
+            try { facesBytes = await repoBytes("faces.json", controller.signal); }
+            catch (e){ facesBytes = null; }
+          }
+          if (facesBytes) zip.file("faces.json", facesBytes, {compression:"DEFLATE"});
+        }
         zip.file("activity.json", JSON.stringify(loadActivity(), null, 2), {compression:"DEFLATE"});
         zip.file("login-logs.json", JSON.stringify(loadLoginLogs(), null, 2), {compression:"DEFLATE"});
         zip.file("audit.json", JSON.stringify(loadAudit(), null, 2), {compression:"DEFLATE"});
@@ -3179,11 +3316,12 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
         zip.file("README.txt", "MY VISUALS — COMPLETE LIBRARY BACKUP\nCreated: " + createdAt + "\n\n"
           + "images/ holds original library files. thumbs/ holds all referenced previews.\n"
           + "library.json preserves names, tags, favorites, folder hierarchy, dates and custom order.\n"
+          + "faces.json, when present, holds optional face signatures for People. Share-link downloads do not include it.\n"
           + "activity.json is this device's activity history at the snapshot time.\n"
           + "backup.json describes this archive. No GitHub token is included.\n\n"
           + "MANUAL RESTORE\n1. Extract this ZIP and keep a separate copy.\n"
           + "2. Use a private GitHub data repository with an initialized branch.\n"
-          + "3. Copy images/, thumbs/ and library.json to that repository's root, preserving paths.\n"
+          + "3. Copy images/, thumbs/, library.json and faces.json (if present) to that repository's root, preserving paths.\n"
           + "4. Commit them, then connect My Visuals to the repository.\n"
           + "When restoring into a nonempty repository, reconcile existing metadata first.\n"
           + "Git history, unrelated repository files and your device token are not included.\n"
@@ -3577,6 +3715,7 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
           ? h("button", {type:"button", "aria-label":"Remove tag " + t, onclick:() => patch(it.id, {tags: tags.filter((x) => x !== t)})}, icon("close"))
           : null))
       : [h("p", {class:"notags", text:"No tags yet"})]));
+    renderDetailFaces(it);
   }
   function addDetailTags(){
     const it = find(state.openId); if (!it) return;
@@ -3663,6 +3802,7 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     if (!canEdit) return 0;
     const n = purgeTrash(ids);
     if (!n) return 0;
+    forgetItemFaces(ids);
     render(); if (!$("#trashSheet").hidden) renderTrashSheet(); scheduleSave(); flushSave();
     const msg = plural(n, "file", "files") + " permanently deleted";
     if (!silent) toast(msg);
@@ -4030,6 +4170,10 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     toast(msg);
     if (added.length && canEdit) logActivity(itemsLabel(added) + " added" + (folder ? " to " + folderName(folder) : "") + (shareMode ? " through a visitor upload link" : ""), "upload",
       {kind:"image.upload", folderId:folder || "", folder:folder ? folderPath(folder) : "", count:added.length});
+    if (added.length && canEdit && !shareMode && !deviceLocked && faceAutoScan()){
+      const ids = added.filter((it) => !isVideo(it)).map((it) => it.id);
+      if (ids.length) scanItems(ids, {quiet:true});
+    }
   }
 
   // ---------- image editor: non-destructive canvas edits, archived versions ----------
@@ -4605,6 +4749,7 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     urlCache.forEach((u) => URL.revokeObjectURL(u)); urlCache.clear();
     videoUrls.forEach((u) => URL.revokeObjectURL(u)); videoUrls.clear();
     state.items = []; state.folders = []; state.shareLinks = []; state.shareRevokedBefore = 0; state.auditWebhook = null; state.folder = null; state.sha = null;
+    resetFacesSession();
     state.tag = null; state.fav = false; state.vid = false; state.q = ""; $("#q").value = "";
   }
 
@@ -4790,6 +4935,8 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
       return {id:"sample"+i,file,thumb,name,tags,fav,folder,createdAt:now-i*day,size:blob.size,thumbSize:blob.size,type:"image/svg+xml",order,sha:"sample-sha-"+i,_url:URL.createObjectURL(blob)};
     });
     sortFolders(); state.sha = "sample-library-sha";
+    state.people = []; state.faces = []; state.faceScans = []; state.facesSha = null; state.personId = "";
+    facesKnown = true; facesBlocked = false; facesReplace = false; facesError = "";
     state.shareLinks = [
       {id:"slink-1", folderId:"ftravel", folderName:"Travel", createdAt:now-2*day, expiresAt:now+7*day, passwordProtected:true, requireName:true, allowDl:false, revoked:false}
     ];
@@ -5045,6 +5192,13 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     "collection.create":{group:"edit", icon:"plus", label:"Collection"},
     "collection.edit":{group:"edit", icon:"tag", label:"Collection"},
     "collection.delete":{group:"edit", icon:"trash", label:"Collection"},
+    "faces.scan":{group:"edit", icon:"faces", label:"Face scan"},
+    "faces.forget":{group:"edit", icon:"faces", label:"Forget faces"},
+    "person.rename":{group:"edit", icon:"faces", label:"Name person"},
+    "person.merge":{group:"edit", icon:"faces", label:"Merge people"},
+    "person.hide":{group:"edit", icon:"faces", label:"Hide person"},
+    "person.forget":{group:"edit", icon:"faces", label:"Forget person"},
+    "person.split":{group:"edit", icon:"faces", label:"Move face"},
     "search.save":{group:"edit", icon:"search", label:"Smart folder"},
     "search.delete":{group:"edit", icon:"trash", label:"Smart folder"},
     "backup.create":{group:"system", icon:"download", label:"Backup"},
@@ -6323,6 +6477,612 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     toast("Theme: " + (next === "system" ? "Auto — follows your device" : next === "dark" ? "Dark" : "Light"));
   }
 
+  // ---------- face recognition (on device; signatures live in private faces.json) ----------
+  const FACE_AUTO_KEY = "visuals-faces-autoscan-v1";
+  const FACES_LOCAL = "visuals-faces-pending-v1";
+  const FACE_CAP = 5000;
+  let facesKnown = false, facesBlocked = false, facesReplace = false, facesError = "", facesSaveGen = 0, facesSavedGen = 0, facesTimer = 0, facesSaving = null;
+  const facesDeletedPeople = new Set(), facesDeletedFaces = new Set();
+  const PEOPLE_CAP = 2000;
+  let faceScanGen = 0, faceScanning = false, faceProbeUrl = "";
+  let peForgetArmed = false, peForgetTimer = 0, psForgetArmed = false, psForgetTimer = 0;
+  const facesDirty = () => facesSaveGen !== facesSavedGen || !!facesSaving;
+  const canPersistFaces = () => canEdit && !shareMode && !state.demo && facesKnown && !facesBlocked;
+  const faceAutoScan = () => readLocal(FACE_AUTO_KEY, false) === true;
+  const findPerson = (id) => (state.people || []).find((p) => p.id === id) || null;
+  const activePerson = () => state.personId ? findPerson(state.personId) : null;
+  function personLabel(p){
+    if (!p) return "Person";
+    if (p.name) return p.name;
+    const unnamed = (state.people || []).filter((x) => !x.name).sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0) || a.id.localeCompare(b.id));
+    const i = unnamed.findIndex((x) => x.id === p.id);
+    return "Person " + (i >= 0 ? i + 1 : 1);
+  }
+  function facesOfPerson(id){ return (state.faces || []).filter((f) => f.person === id && !f.ignored); }
+  function itemsForPerson(id){
+    return [...new Set(facesOfPerson(id).map((f) => f.item))].filter((itemId) => find(itemId));
+  }
+  function peopleForItem(id){
+    const ids = new Set((state.faces || []).filter((f) => f.item === id && f.person && !f.ignored).map((f) => f.person));
+    return (state.people || []).filter((p) => ids.has(p.id));
+  }
+  function visiblePeople(){
+    return (state.people || []).filter((p) => !p.hidden && itemsForPerson(p.id).length)
+      .sort((a, b) => personLabel(a).localeCompare(personLabel(b), undefined, {sensitivity:"base"}) || a.id.localeCompare(b.id));
+  }
+  function coverFace(p){
+    const faces = facesOfPerson(p.id);
+    if (p.cover){ const hit = faces.find((f) => f.id === p.cover); if (hit) return hit; }
+    return faces.slice().sort((a, b) => (b.box[2] * b.box[3]) - (a.box[2] * a.box[3]))[0] || null;
+  }
+  function faceCrop(it, box, size){
+    const el = h("div", {class:"face-crop"});
+    el.style.width = (size || 72) + "px"; el.style.height = (size || 72) + "px";
+    if (box){
+      el.style.setProperty("--fx", String(box[0])); el.style.setProperty("--fy", String(box[1]));
+      el.style.setProperty("--fw", String(Math.max(0.05, box[2]))); el.style.setProperty("--fh", String(Math.max(0.05, box[3])));
+    }
+    const img = h("img", {alt:"", draggable:"false"});
+    el.append(img);
+    if (it) getUrl(it, !!(it.thumb || it._turl)).then((u) => { if (img.isConnected) img.src = u; }, () => {});
+    return el;
+  }
+  function scanKey(it){ return String(it.sha || "") + ":" + String(it.updatedAt || it.createdAt || 0) + ":" + String(it.size || 0); }
+  function unscannedItems(){
+    const scanned = new Map((state.faceScans || []).map((s) => [s.item, s.key]));
+    return state.items.filter((it) => !isVideo(it) && scanned.get(it.id) !== scanKey(it));
+  }
+  function cleanPerson(p){
+    if (!p || typeof p.id !== "string" || !p.id) return null;
+    const out = {id:p.id.slice(0, 40), name:String(p.name || "").trim().slice(0, 60), hidden:!!p.hidden,
+      createdAt:Number(p.createdAt) || Date.now(), updatedAt:Number(p.updatedAt) || 0};
+    if (typeof p.c === "string" && p.c.length >= 16 && p.c.length < 400) out.c = p.c;
+    if (typeof p.cover === "string" && p.cover) out.cover = p.cover.slice(0, 40);
+    return out;
+  }
+  function cleanFace(f){
+    if (!f || typeof f.id !== "string" || !f.id || typeof f.item !== "string" || !f.item) return null;
+    const box = window.VisualsFaces ? VisualsFaces.cleanBox(f.box) : (Array.isArray(f.box) ? f.box : null);
+    if (!box) return null;
+    const out = {id:f.id.slice(0, 40), item:f.item.slice(0, 80), person:typeof f.person === "string" ? f.person.slice(0, 40) : "",
+      box, score:Math.max(0, Math.min(1, Number(f.score) || 0))};
+    if (typeof f.d === "string" && f.d.length >= 16 && f.d.length < 400) out.d = f.d;
+    if (f.pinned) out.pinned = true;
+    if (f.ignored) out.ignored = true;
+    return out;
+  }
+  function cleanScan(s){
+    if (!s || typeof s.item !== "string" || !s.item) return null;
+    return {item:s.item.slice(0, 80), key:String(s.key || "").slice(0, 200), at:Number(s.at) || 0, count:Math.max(0, Number(s.count) || 0)};
+  }
+  function facesSnapshot(){
+    return {version:1, people:(state.people || []).map(cleanPerson).filter(Boolean),
+      faces:(state.faces || []).map(cleanFace).filter(Boolean).slice(0, FACE_CAP),
+      scans:(state.faceScans || []).map(cleanScan).filter(Boolean).slice(0, 8000)};
+  }
+  function normFaces(data){
+    const d = data && typeof data === "object" ? data : {};
+    if (d.version && Number(d.version) > 1) return {blocked:true};
+    const seenP = new Set(), seenF = new Set();
+    const people = (Array.isArray(d.people) ? d.people : []).map(cleanPerson).filter((p) => p && !seenP.has(p.id) && seenP.add(p.id)).slice(0, PEOPLE_CAP);
+    const ids = new Set(people.map((p) => p.id));
+    const faces = (Array.isArray(d.faces) ? d.faces : []).map(cleanFace).filter((f) => f && !seenF.has(f.id) && seenF.add(f.id))
+      .map((f) => ids.has(f.person) ? f : {...f, person:""});
+    const scans = (Array.isArray(d.scans) ? d.scans : []).map(cleanScan).filter(Boolean);
+    return {people, faces, scans, blocked:false};
+  }
+  function facesLocalKey(){ return FACES_LOCAL + ":" + repoKey(); }
+  function readFacesPending(){
+    if (state.demo) return null;
+    const q = readLocal(facesLocalKey(), null);
+    return q && q.snapshot ? q : null;
+  }
+  function writeFacesPending(){
+    if (state.demo || !canEdit) return;
+    writeLocal(facesLocalKey(), {t:Date.now(), sha:state.facesSha || "", replace:facesReplace,
+      deletedPeople:[...facesDeletedPeople], deletedFaces:[...facesDeletedFaces], snapshot:facesSnapshot()});
+  }
+  function clearFacesPending(){ try { localStorage.removeItem(facesLocalKey()); } catch (e) {} }
+  function dropDeletedFaces(){
+    state.people = (state.people || []).filter((p) => !facesDeletedPeople.has(p.id)).slice(0, PEOPLE_CAP);
+    state.faces = (state.faces || []).filter((f) => !facesDeletedFaces.has(f.id) && !facesDeletedPeople.has(f.person)).slice(0, FACE_CAP);
+  }
+  function mergeFaces(remote){
+    if (!remote || remote.blocked) return;
+    const pMap = new Map((state.people || []).map((p) => [p.id, p]));
+    for (const rp of remote.people){
+      if (facesDeletedPeople.has(rp.id)) continue;
+      const cur = pMap.get(rp.id);
+      if (!cur) pMap.set(rp.id, rp);
+      else if ((rp.updatedAt || 0) > (cur.updatedAt || 0)) pMap.set(rp.id, {...cur, ...rp});
+    }
+    const fMap = new Map((state.faces || []).map((f) => [f.id, f]));
+    for (const rf of remote.faces){
+      if (facesDeletedFaces.has(rf.id) || facesDeletedPeople.has(rf.person)) continue;
+      if (!fMap.has(rf.id)) fMap.set(rf.id, rf);
+    }
+    const sMap = new Map((state.faceScans || []).map((s) => [s.item, s]));
+    for (const rs of remote.scans){
+      const cur = sMap.get(rs.item);
+      if (!cur || (rs.at || 0) > (cur.at || 0)) sMap.set(rs.item, rs);
+    }
+    state.people = [...pMap.values()].slice(0, PEOPLE_CAP);
+    state.faces = [...fMap.values()].slice(0, FACE_CAP);
+    state.faceScans = [...sMap.values()];
+    dropDeletedFaces();
+  }
+  async function fetchFaces(){
+    const repo = {...cfg}, path = "contents/faces.json?ref=" + enc(repo.branch);
+    const r = await gh("GET", path, undefined, repo);
+    if (r.status === 404) return {sha:null, missing:true, data:null};
+    if (!r.ok) throw githubError(r.status);
+    if (!r.json) throw new Error("GitHub returned empty face data.");
+    let text;
+    if (r.json.content) text = b64Text(r.json.content);
+    else text = await request(`https://api.github.com/repos/${enc(repo.owner)}/${enc(repo.repo)}/${path}`,
+      {cache:"no-store", headers:{"Accept":"application/vnd.github.raw+json","X-GitHub-Api-Version":"2022-11-28","Authorization":"Bearer " + repo.token}},
+      async (raw) => { if (!raw.ok) throw githubError(raw.status); return raw.text(); }, {label:"Loading face data…"});
+    return {sha:r.json.sha || null, missing:false, data:JSON.parse(text)};
+  }
+  async function loadFaces(){
+    if (shareMode || !canEdit){ state.people = []; state.faces = []; state.faceScans = []; facesKnown = false; return; }
+    if (state.demo){ facesKnown = true; facesBlocked = false; return; }
+    facesError = "";
+    let remote;
+    try { remote = await fetchFaces(); }
+    catch (e){
+      facesKnown = false; facesBlocked = true;
+      facesError = e && e.message ? e.message : "Couldn't read saved face data, so it was left untouched.";
+      return;
+    }
+    if (remote.missing){
+      state.people = []; state.faces = []; state.faceScans = []; state.facesSha = null;
+      facesKnown = true; facesBlocked = false;
+    } else {
+      let parsed;
+      try { parsed = normFaces(remote.data); }
+      catch (e){ parsed = {blocked:true}; }
+      if (parsed.blocked){
+        facesKnown = false; facesBlocked = true; state.facesSha = remote.sha;
+        facesError = "faces.json in the repository could not be read, so it was left untouched.";
+        return;
+      }
+      state.facesSha = remote.sha; state.people = parsed.people; state.faces = parsed.faces; state.faceScans = parsed.scans;
+      facesKnown = true; facesBlocked = false;
+    }
+    const pending = readFacesPending();
+    if (pending && pending.snapshot){
+      for (const id of pending.deletedPeople || []) facesDeletedPeople.add(id);
+      for (const id of pending.deletedFaces || []) facesDeletedFaces.add(id);
+      if (pending.replace){
+        facesReplace = true;
+        const local = normFaces(pending.snapshot);
+        if (!local.blocked){ state.people = local.people; state.faces = local.faces; state.faceScans = local.scans; }
+      } else mergeFaces(normFaces(pending.snapshot));
+      dropDeletedFaces();
+      scheduleFacesSave();
+    }
+    pruneOrphanFaces(false);
+  }
+  function resetFacesSession(){
+    faceScanGen++; faceScanning = false; clearTimeout(facesTimer);
+    state.people = []; state.faces = []; state.faceScans = []; state.facesSha = null; state.personId = "";
+    facesKnown = false; facesBlocked = false; facesReplace = false; facesError = ""; facesSaveGen = 0; facesSavedGen = 0;
+    facesDeletedPeople.clear(); facesDeletedFaces.clear();
+    if (faceProbeUrl){ URL.revokeObjectURL(faceProbeUrl); faceProbeUrl = ""; }
+  }
+  function scheduleFacesSave(){
+    if (!canPersistFaces()){ if (canEdit && !shareMode && !state.demo && facesKnown) writeFacesPending(); return; }
+    facesSaveGen++; writeFacesPending(); clearTimeout(facesTimer); facesTimer = setTimeout(() => { flushFaces(); }, 700);
+  }
+  function commitFaces(){ scheduleFacesSave(); render(); if (!$("#peopleSheet").hidden) renderPeopleSheet(); if (!$("#personSheet").hidden) renderPersonSheet(); refreshDetail(); }
+  async function putFaces(retry = true){
+    const payload = facesSnapshot();
+    const body = {message:"Update face recognition", branch:cfg.branch, content:textB64(JSON.stringify(payload))};
+    if (state.facesSha) body.sha = state.facesSha;
+    const r = await ghWrite("PUT", "contents/faces.json", body);
+    if ((r.status === 409 || r.status === 422) && retry){
+      const remote = await fetchFaces();
+      state.facesSha = remote.sha;
+      if (!remote.missing && remote.data){
+        const parsed = normFaces(remote.data);
+        if (parsed.blocked && !facesReplace){
+          facesKnown = false; facesBlocked = true;
+          facesError = "faces.json in the repository could not be read, so it was left untouched.";
+          throw new Error(facesError);
+        }
+        if (!parsed.blocked && !facesReplace) mergeFaces(parsed);
+      }
+      dropDeletedFaces();
+      return putFaces(false);
+    }
+    if (!r.ok) throw {status:r.status};
+    state.facesSha = r.json && r.json.content && r.json.content.sha || state.facesSha;
+    return true;
+  }
+  function flushFaces(){
+    clearTimeout(facesTimer);
+    if (!canPersistFaces()) return Promise.resolve(false);
+    if (facesSaveGen === facesSavedGen) return Promise.resolve(true);
+    if (facesSaving) return facesSaving;
+    const session = repoSession, finish = beginLoading("Saving face groups…");
+    facesSaving = (async () => {
+      let ok = true;
+      try {
+        do {
+          const version = facesSaveGen;
+          await putFaces();
+          if (session !== repoSession) return false;
+          facesSavedGen = version;
+        } while (facesSavedGen < facesSaveGen && session === repoSession);
+      } catch (e){
+        ok = false;
+        if (session === repoSession) toast(isOfflineError(e) ? "Face groups will be saved when you're back online." : "Couldn't save face groups.");
+      }
+      if (ok && session === repoSession){
+        facesReplace = false; facesDeletedPeople.clear(); facesDeletedFaces.clear(); clearFacesPending();
+      }
+      return ok;
+    })().finally(() => { finish(); facesSaving = null; });
+    return facesSaving;
+  }
+  function pruneOrphanFaces(save){
+    const live = new Set([...state.items.map((i) => i.id), ...(state.trash || []).map((t) => t.item && t.item.id).filter(Boolean)]);
+    const before = state.faces.length + state.faceScans.length;
+    state.faces = (state.faces || []).filter((f) => live.has(f.item));
+    state.faceScans = (state.faceScans || []).filter((s) => live.has(s.item));
+    const used = new Set(state.faces.filter((f) => f.person).map((f) => f.person));
+    state.people = (state.people || []).filter((p) => used.has(p.id) || p.name || p.c);
+    if (save && state.faces.length + state.faceScans.length !== before) scheduleFacesSave();
+  }
+  function forgetItemFaces(ids){
+    const set = new Set(ids || []);
+    if (!set.size || shareMode || !canEdit) return;
+    const before = state.faces.length;
+    for (const f of state.faces || []) if (set.has(f.item)) facesDeletedFaces.add(f.id);
+    state.faces = (state.faces || []).filter((f) => !set.has(f.item));
+    state.faceScans = (state.faceScans || []).filter((s) => !set.has(s.item));
+    const used = new Set(state.faces.filter((f) => f.person).map((f) => f.person));
+    state.people = (state.people || []).filter((p) => used.has(p.id) || p.name || p.c);
+    if (state.personId && !findPerson(state.personId)) state.personId = "";
+    if (state.faces.length !== before) scheduleFacesSave();
+  }
+  function recomputeCentroid(personId){
+    const p = findPerson(personId); if (!p || !window.VisualsFaces) return;
+    const vecs = facesOfPerson(personId).map((f) => VisualsFaces.dequantize(f.d)).filter(Boolean);
+    if (vecs.length) p.c = VisualsFaces.quantize(VisualsFaces.centroid(vecs));
+    p.updatedAt = Date.now();
+  }
+  function renderPeople(){
+    const sec = $("#peopleSec");
+    const show = canEdit && state.loaded && !state.error && !shareMode && !state.folder && !state.collectionId && !state.smartId && !state.personId && !state.select && !state.reorder;
+    sec.hidden = !show; if (!show) return;
+    const people = visiblePeople(), pending = unscannedItems().length;
+    $("#peopleManage").replaceChildren(icon("faces"), people.length ? "Manage" : "Scan faces");
+    const hint = facesError ? facesError
+      : pending ? plural(pending, "photo hasn't", "photos haven't") + " been scanned. Recognition runs on this device — photos are not sent to a face service."
+      : people.length ? "Tap a person to see their photos. Recognition stays on this device and photos are not sent to a face service."
+      : "Find the same person across your photos. Recognition runs on this device — photos are not sent to a face service.";
+    $("#peopleHint").textContent = hint;
+    $("#peopleRow").hidden = people.length === 0;
+    $("#peopleRow").replaceChildren(...people.map((p) => {
+      const face = coverFace(p), n = itemsForPerson(p.id).length;
+      return h("div", {class:"person-card"},
+        h("button", {class:"person-tile", type:"button", "data-person-id":p.id, "aria-label":personLabel(p) + ", " + plural(n, "photo", "photos"), onclick:() => openPerson(p.id)},
+          face ? faceCrop(find(face.item), face.box, 76) : h("div", {class:"face-crop", style:"width:76px;height:76px;display:grid;place-items:center"}, icon("faces")),
+          h("span", {class:"pname", text:personLabel(p)}),
+          h("span", {class:"psub", text:plural(n, "photo", "photos")})),
+        h("button", {class:"textbtn person-edit", type:"button", "data-person-edit":p.id, text:"Edit", onclick:() => openPersonSheet(p.id)}));
+    }));
+  }
+  function leavePerson(){
+    state.personId = "";
+    try {
+      if (state.demo) history.pushState({demoFolder:state.folder}, "", location.pathname + location.search + "#demo");
+      else history.pushState({}, "", location.pathname + location.search);
+    } catch (e) {}
+    render();
+  }
+  function openPerson(id){
+    const p = findPerson(id); if (!p) return;
+    cancelDrag(); state.reorder = false; exitSelect();
+    state.personId = p.id; state.folder = null; state.collectionId = ""; state.smartId = "";
+    state.tag = null; state.fav = false; state.vid = false; state.geo = false; state.q = ""; $("#q").value = "";
+    try {
+      if (state.demo) history.pushState({demoPerson:p.id}, "", location.pathname + location.search + "#demo");
+      else history.pushState({person:p.id}, "", "#p=" + enc(p.id));
+    } catch (e) {}
+    closeTop(); render(); window.scrollTo(0, 0);
+  }
+  function faceStatus(msg){ const el = $("#peStatus"); if (el) el.textContent = msg || ""; }
+  function renderPeopleSheet(){
+    const people = (state.people || []).slice().sort((a, b) => personLabel(a).localeCompare(personLabel(b), undefined, {sensitivity:"base"}));
+    const shown = $("#peShowHidden").checked ? people : people.filter((p) => !p.hidden);
+    const pending = unscannedItems().length;
+    $("#peAuto").checked = faceAutoScan();
+    $("#peForget").hidden = !people.length && !(state.faces || []).length;
+    $("#peScan").disabled = faceScanning || facesBlocked;
+    $("#peScanAll").disabled = faceScanning || facesBlocked;
+    $("#peMatch").disabled = faceScanning;
+    $("#peCamera").disabled = faceScanning;
+    $("#peCancel").hidden = !faceScanning;
+    if (!faceScanning && !/^Scan /.test($("#peStatus").textContent || "")){
+      faceStatus(facesError || (facesBlocked ? "Saved face data was left untouched." : pending ? plural(pending, "photo", "photos") + " not scanned yet." : people.length ? plural(people.filter((p) => !p.hidden).length, "person", "people") + " in this library." : "No faces saved yet."));
+    }
+    $("#peList").replaceChildren(...(shown.length ? shown.map((p) => {
+      const n = itemsForPerson(p.id).length, face = coverFace(p);
+      return h("div", {class:"row"},
+        face ? faceCrop(find(face.item), face.box, 44) : icon("faces"),
+        h("span", {class:"rl"}, personLabel(p), h("small", {text:(p.hidden ? "Hidden · " : "") + (n ? plural(n, "photo", "photos") : "No photos")})),
+        h("button", {class:"btn small", type:"button", "data-person-edit":p.id, text:"Edit", onclick:() => openPersonSheet(p.id)}));
+    }) : [h("p", {class:"notags", text:facesBlocked ? "Face data couldn't be read." : "Scan photos to find people."})]));
+  }
+  function openPeopleSheet(){
+    if (!canEdit){ toast("Connect your library to use face recognition."); return; }
+    $("#peShowHidden").checked = false;
+    resetPeForget();
+    $("#peMatchOut").hidden = true; $("#peMatchOut").replaceChildren();
+    $("#peStatus").textContent = "";
+    renderPeopleSheet();
+    openTop("#peopleSheet");
+  }
+  function resetPeForget(){ peForgetArmed = false; clearTimeout(peForgetTimer); $("#peForget").textContent = facesBlocked ? "Replace unreadable face data" : "Forget all faces"; }
+  function forgetAllFaces(){
+    if (!canEdit) return;
+    if (!peForgetArmed){
+      peForgetArmed = true; $("#peForget").textContent = "Tap again to forget";
+      peForgetTimer = setTimeout(resetPeForget, 4000);
+      return;
+    }
+    resetPeForget();
+    for (const p of state.people || []) facesDeletedPeople.add(p.id);
+    for (const f of state.faces || []) facesDeletedFaces.add(f.id);
+    facesReplace = true;
+    state.people = []; state.faces = []; state.faceScans = []; state.personId = "";
+    facesBlocked = false; facesKnown = true; facesError = "";
+    audit("faces.forget", "Forgot all face recognition data");
+    commitFaces(); flushFaces();
+    toast("Face groups removed. Photos were kept.");
+    renderPeopleSheet();
+  }
+  function renderPersonSheet(){
+    const p = findPerson(personEditingId);
+    if (!p){ $("#psTitle").textContent = "Person"; return; }
+    $("#psTitle").textContent = personLabel(p);
+    if (document.activeElement !== $("#psName")) $("#psName").value = p.name || "";
+    const faces = (state.faces || []).filter((f) => f.person === p.id);
+    const photos = itemsForPerson(p.id);
+    $("#psMeta").textContent = (p.hidden ? "Hidden · " : "") + (photos.length ? plural(photos.length, "photo", "photos") : "No photos") + " · " + plural(faces.filter((f) => !f.ignored).length, "face", "faces");
+    $("#psHide").textContent = p.hidden ? "Show in People" : "Hide";
+    const others = (state.people || []).filter((x) => x.id !== p.id);
+    $("#psMergeRow").hidden = !others.length;
+    $("#psMerge").replaceChildren(...others.map((x) => h("option", {value:x.id, text:personLabel(x)})));
+    $("#psFaces").replaceChildren(...faces.slice(0, 24).map((f) => {
+      const it = find(f.item);
+      return h("div", {class:"person-card"},
+        h("button", {class:"person-tile", type:"button", "aria-label":"Open photo", onclick:() => { closeTop(); if (it) openViewer(it.id); }},
+          it ? faceCrop(it, f.box, 64) : h("div", {class:"face-crop", style:"width:64px;height:64px"}),
+          h("span", {class:"psub", text:f.ignored ? "Ignored" : (it && it.name) || "Photo"})),
+        f.ignored ? null : h("button", {class:"textbtn person-edit", type:"button", text:"Not this person", onclick:() => splitFace(f.id)}),
+        h("button", {class:"textbtn person-edit", type:"button", text:f.ignored ? "It's a face" : "Not a face", onclick:() => toggleIgnoreFace(f.id)}));
+    }));
+  }
+  let personEditingId = "";
+  function openPersonSheet(id){
+    const p = findPerson(id); if (!p || !canEdit) return;
+    personEditingId = p.id; psForgetArmed = false; $("#psForget").textContent = "Forget this person"; $("#psMsg").textContent = "";
+    renderPersonSheet();
+    openTop("#personSheet");
+    setTimeout(() => { const f = $("#psName"); if (f && !$("#personSheet").hidden) f.focus({preventScroll:true}); }, 30);
+  }
+  function savePersonName(){
+    const p = findPerson(personEditingId); if (!p) return;
+    const next = $("#psName").value.trim().slice(0, 60);
+    if (next === (p.name || "")){ $("#psMsg").textContent = next ? "Saved." : "Add a name, or leave it blank."; return; }
+    const old = personLabel(p);
+    p.name = next; p.updatedAt = Date.now();
+    audit("person.rename", "Named " + old + (next ? " as “" + next + "”" : " as unnamed"));
+    commitFaces();
+    $("#psMsg").textContent = "Saved.";
+    toast(next ? "Named “" + next + "”." : "Name cleared.");
+  }
+  function mergePerson(){
+    const src = findPerson(personEditingId); if (!src) return;
+    const target = findPerson($("#psMerge").value); if (!target || target.id === src.id) return;
+    for (const f of state.faces) if (f.person === src.id){ f.person = target.id; f.pinned = true; }
+    recomputeCentroid(target.id);
+    state.people = state.people.filter((p) => p.id !== src.id);
+    if (state.personId === src.id) state.personId = target.id;
+    personEditingId = target.id;
+    audit("person.merge", "Merged “" + personLabel(src) + "” into “" + personLabel(target) + "”");
+    commitFaces();
+    toast("Merged into “" + personLabel(target) + "”.");
+    renderPersonSheet();
+  }
+  function toggleHidePerson(){
+    const p = findPerson(personEditingId); if (!p) return;
+    p.hidden = !p.hidden; p.updatedAt = Date.now();
+    audit("person.hide", (p.hidden ? "Hid" : "Showed") + " “" + personLabel(p) + "” in People");
+    commitFaces();
+  }
+  function forgetPerson(){
+    const p = findPerson(personEditingId); if (!p) return;
+    if (!psForgetArmed){
+      psForgetArmed = true; $("#psForget").textContent = "Tap again to forget";
+      psForgetTimer = setTimeout(() => { psForgetArmed = false; $("#psForget").textContent = "Forget this person"; }, 4000);
+      return;
+    }
+    const label = personLabel(p);
+    for (const f of state.faces) if (f.person === p.id) facesDeletedFaces.add(f.id);
+    facesDeletedPeople.add(p.id);
+    state.faces = state.faces.filter((f) => f.person !== p.id);
+    state.people = state.people.filter((x) => x.id !== p.id);
+    if (state.personId === p.id) state.personId = "";
+    personEditingId = "";
+    audit("person.forget", "Forgot the person “" + label + "”");
+    commitFaces();
+    closeTop();
+    toast("Forgot “" + label + "”. Photos were kept.");
+  }
+  function splitFace(faceId){
+    const f = (state.faces || []).find((x) => x.id === faceId); if (!f || !window.VisualsFaces) return;
+    const old = f.person;
+    const now = Date.now();
+    const person = {id:"p-" + uid(), name:"", hidden:false, createdAt:now, updatedAt:now, c:f.d || ""};
+    f.person = person.id; f.pinned = true;
+    state.people = [...(state.people || []), person];
+    recomputeCentroid(old); recomputeCentroid(person.id);
+    audit("person.split", "Moved a face out of “" + personLabel(findPerson(old) || {name:""}) + "”");
+    personEditingId = person.id;
+    commitFaces();
+    renderPersonSheet();
+    toast("Moved to a new person. Name them if you know who it is.");
+  }
+  function toggleIgnoreFace(faceId){
+    const f = (state.faces || []).find((x) => x.id === faceId); if (!f) return;
+    f.ignored = !f.ignored; f.pinned = true;
+    if (f.person) recomputeCentroid(f.person);
+    commitFaces();
+    renderPersonSheet();
+  }
+  function boxesOverlap(a, b){
+    if (!a || !b) return false;
+    const x1 = Math.max(a[0], b[0]), y1 = Math.max(a[1], b[1]);
+    const x2 = Math.min(a[0] + a[2], b[0] + b[2]), y2 = Math.min(a[1] + a[3], b[1] + b[3]);
+    const inter = Math.max(0, x2 - x1) * Math.max(0, y2 - y1);
+    const union = a[2] * a[3] + b[2] * b[3] - inter;
+    return union > 0 && inter / union > 0.45;
+  }
+  async function loadScanImage(it){
+    const url = await getUrl(it, false);
+    const img = new Image();
+    img.decoding = "async";
+    await new Promise((resolve, reject) => { img.onload = () => resolve(); img.onerror = () => reject(new Error("unreadable")); img.src = url; });
+    return img;
+  }
+  async function detectItem(it){
+    if (typeof window.__visualsFaceDetect === "function") return window.__visualsFaceDetect(it) || [];
+    if (!window.VisualsFaces) throw new Error("Face recognition isn't available in this copy of the app.");
+    const img = await loadScanImage(it);
+    return VisualsFaces.detect(img);
+  }
+  async function scanItems(ids, {rescan = false, quiet = false} = {}){
+    if (!canEdit || shareMode || faceScanning) return;
+    if (facesBlocked){ toast(facesError || "Saved face data was left untouched."); return; }
+    if (!window.VisualsFaces){ toast("Face recognition isn't available in this copy of the app."); return; }
+    const wanted = new Set(ids || []);
+    const list = state.items.filter((it) => !isVideo(it) && (!wanted.size || wanted.has(it.id)) && (rescan || (state.faceScans || []).find((s) => s.item === it.id)?.key !== scanKey(it)));
+    if (!list.length){ if (!quiet) toast(rescan ? "No photos to scan." : "Every photo is already scanned."); faceStatus("Every photo is already scanned."); return; }
+    const gen = ++faceScanGen; faceScanning = true; renderPeopleSheet();
+    let found = 0, failed = 0, skipped = 0, peopleBefore = new Set((state.people || []).map((p) => p.id));
+    try {
+      if (typeof window.__visualsFaceDetect !== "function"){
+        const finish = beginLoading("Loading face recognition…");
+        try { await VisualsFaces.load(); }
+        finally { finish(); }
+      }
+      if (gen !== faceScanGen) return;
+      for (let i = 0; i < list.length; i++){
+        if (gen !== faceScanGen) break;
+        const it = list[i];
+        faceStatus("Scanning " + (i + 1) + " of " + list.length + " · " + (it.name || "photo"));
+        const pinned = (state.faces || []).filter((f) => f.item === it.id && f.pinned);
+        if (rescan && pinned.length){ skipped++; continue; }
+        let detections = [];
+        try { detections = await detectItem(it); }
+        catch (e){ failed++; continue; }
+        if (gen !== faceScanGen) break;
+        detections = (detections || []).filter((d) => !pinned.some((p) => boxesOverlap(d.box, p.box)));
+        for (const old of state.faces || []) if (old.item === it.id && !old.pinned) facesDeletedFaces.add(old.id);
+        const kept = (state.faces || []).filter((f) => f.item !== it.id || f.pinned);
+        const result = VisualsFaces.cluster(detections, {people:state.people, faces:kept, itemId:it.id, uid, now:Date.now(), maxPeople:PEOPLE_CAP});
+        state.people = result.people;
+        state.faces = kept.concat(result.faces).slice(0, FACE_CAP);
+        state.faceScans = (state.faceScans || []).filter((s) => s.item !== it.id).concat([{item:it.id, key:scanKey(it), at:Date.now(), count:result.faces.length}]);
+        found += result.faces.length;
+        if (i % 4 === 3){ scheduleFacesSave(); render(); }
+        await new Promise((r) => setTimeout(r, 0));
+      }
+      const created = (state.people || []).filter((p) => !peopleBefore.has(p.id)).length;
+      scheduleFacesSave(); flushFaces();
+      audit("faces.scan", "Scanned " + plural(list.length - failed, "photo", "photos") + " and found " + plural(found, "face", "faces"), {count:found, status:gen === faceScanGen ? "success" : "cancelled"});
+      const msg = (gen === faceScanGen ? "Scan finished. " : "Scan stopped. ") + plural(found, "face", "faces")
+        + (created ? " · " + plural(created, "new person", "new people") : "")
+        + (skipped ? " · skipped " + skipped + " with manual matches" : "")
+        + (failed ? " · " + failed + " couldn't be read" : "");
+      faceStatus(msg);
+      if (!quiet || found) toast(msg);
+    } catch (e){
+      const msg = e && e.message ? e.message : "Face recognition couldn't load.";
+      faceStatus(msg); toast(msg);
+    } finally {
+      if (gen === faceScanGen) faceScanning = false;
+      render(); renderPeopleSheet(); refreshDetail();
+    }
+  }
+  function renderDetailFaces(it){
+    const block = $("#dFacesBlock"), boxes = $("#dFaceBoxes");
+    if (!block || !boxes) return;
+    const show = canEdit && it && !isVideo(it);
+    block.hidden = !show;
+    if (!show){ boxes.hidden = true; boxes.replaceChildren(); return; }
+    const faces = (state.faces || []).filter((f) => f.item === it.id && !f.ignored);
+    $("#dFaceScan").textContent = (state.faceScans || []).some((s) => s.item === it.id) ? "Scan this photo again" : "Scan this photo";
+    $("#dFaces").replaceChildren(...(faces.length ? faces.map((f) => {
+      const p = findPerson(f.person);
+      return h("button", {class:"person-tile", type:"button", "data-face-id":f.id, onclick:() => { if (p) openPerson(p.id); else openPeopleSheet(); }},
+        faceCrop(it, f.box, 56),
+        h("span", {class:"pname", text:p ? personLabel(p) : "Unsorted"}));
+    }) : [h("p", {class:"notags", text:(state.faceScans || []).some((s) => s.item === it.id) ? "No faces in this photo." : "Not scanned yet."})]));
+    boxes.hidden = !faces.length;
+    boxes.replaceChildren(...faces.map((f) => {
+      const p = findPerson(f.person);
+      const b = h("button", {type:"button", "aria-label":p ? personLabel(p) : "Face", onclick:() => { if (p) openPersonSheet(p.id); }},
+        h("span", {text:p ? personLabel(p) : "Face"}));
+      b.style.left = (f.box[0] * 100) + "%"; b.style.top = (f.box[1] * 100) + "%";
+      b.style.width = (f.box[2] * 100) + "%"; b.style.height = (f.box[3] * 100) + "%";
+      return b;
+    }));
+  }
+  async function matchProbeFile(file){
+    if (!file || !canEdit) return;
+    if (!window.VisualsFaces){ toast("Face recognition isn't available in this copy of the app."); return; }
+    const type = file.type || "";
+    if (type && !/^image\//.test(type)){ toast("Choose a photo."); return; }
+    if (faceProbeUrl) URL.revokeObjectURL(faceProbeUrl);
+    faceProbeUrl = URL.createObjectURL(file);
+    const out = $("#peMatchOut");
+    out.hidden = false;
+    out.replaceChildren(h("p", {class:"notags", text:"Looking for faces in this photo…"}));
+    try {
+      if (typeof window.__visualsFaceDetect !== "function") await VisualsFaces.load();
+      const detections = typeof window.__visualsFaceDetect === "function"
+        ? await window.__visualsFaceDetect({id:"probe", name:file.name, file:file.name})
+        : await VisualsFaces.detect(faceProbeUrl);
+      if (!detections.length){
+        out.replaceChildren(h("p", {class:"notags", text:"No face found in that photo."}));
+        return;
+      }
+      const rows = detections.slice(0, 6).map((det) => {
+        const match = VisualsFaces.matchDescriptor(det.descriptor, state.people, state.faces);
+        const near = Number.isFinite(match.distance) && match.distance <= VisualsFaces.MATCH_DISTANCE + (VisualsFaces.SOFT_MARGIN || 0.08);
+        const person = near ? findPerson(match.personId || match.nearestId) : null;
+        const confident = !!match.personId && match.distance <= VisualsFaces.MATCH_DISTANCE;
+        const dist = Number.isFinite(match.distance) ? match.distance.toFixed(2) : "";
+        const label = !person ? "No saved person is close to this face."
+          : confident ? "Looks like " + personLabel(person) + (dist ? " · distance " + dist : "")
+          : "Closest is " + personLabel(person) + ", but not a confident match" + (dist ? " (" + dist + ")" : "") + ".";
+        return h("div", {class:"row face-match"},
+          faceCrop({_url:faceProbeUrl, thumb:""}, det.box, 56),
+          h("span", {class:"rl"}, label, person && itemsForPerson(person.id).length ? h("small", {text:plural(itemsForPerson(person.id).length, "photo", "photos") + " in the library"}) : null),
+          person ? h("button", {class:"btn small", type:"button", text:"Show photos", onclick:() => openPerson(person.id)}) : null);
+      });
+      out.replaceChildren(...rows, h("p", {class:"hint", text:"This photo was matched on this device and was not uploaded."}));
+    } catch (e){
+      out.replaceChildren(h("p", {class:"notags", text:e && e.message ? e.message : "Couldn't match that photo."}));
+    }
+  }
+
   // ---------- command palette + keyboard shortcuts ----------
   function paletteCommands(){
     const out = [], fold = state.folder && findFolder(state.folder);
@@ -6335,6 +7095,7 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     add("Videos", "", "video", () => { state.vid = true; render(); }, "movies");
     add("Geotagged files", "", "info", () => { state.geo = true; render(); }, "gps map");
     add("Clear filters", "", "close", () => { clearFilters(); }, "reset");
+    if (canEdit) add("People", "", "faces", () => openPeopleSheet(), "faces recognition scan person");
     if (canEdit) add("Select files", "", "check", () => enterSelect(), "bulk");
     if (canEdit && !isFiltering()) add("Reorder files", "", "grip", () => { state.reorder = true; state.sort = "manual"; render(); }, "custom order");
     if (state.loaded && !state.error && (!shareMode || shareAllowDl)) add("Download this folder as .zip", "", "download", () => { if (state.folder) zipFolder(state.folder); }, "export");
@@ -6354,6 +7115,7 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     add("Keyboard shortcuts", "?", "info", () => openShortcuts());
     if (state.demo) add("Exit sample mode", "", "close", () => exitDemo());
     for (const f of flatFolders().slice(0, 40)) add("Go to " + folderPath(f.id), "Folder", "folder", () => { navigate(f.id); });
+    if (canEdit) for (const p of visiblePeople().slice(0, 20)) add("Photos of " + personLabel(p), "Person", "faces", () => openPerson(p.id), personLabel(p));
     for (const it of visible().slice(0, 12)) add("Open " + (it.name || "file"), isVideo(it) ? "Video" : "Image", isVideo(it) ? "video" : "image", () => openViewer(it.id));
     return out;
   }
@@ -6407,7 +7169,8 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     ["Space", "Play or pause a video in the viewer"],
     ["A", "Add images or videos"],
     ["T", "Cycle the theme: Auto, Light, Dark"],
-    ["S", "Start selecting files (owner)"]
+    ["S", "Start selecting files (owner)"],
+    ["P", "Open People (owner)"]
   ];
   function openShortcuts(){
     $("#ksList").replaceChildren(...SHORTCUTS.map(([keys, what]) => h("div", {class:"row", style:"cursor:default"},
@@ -6453,7 +7216,7 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
   $("#securityBtn").replaceChildren(icon("shield"), "Security & Logins");
   $("#shareZipBtn").replaceChildren(icon("download"), "Download folder as .zip");
   resetBulkDelete(); resetFolderDelete();
-  for (const id of ["#upClose", "#dClose", "#sClose", "#fClose", "#mClose", "#aClose", "#btClose", "#secClose", "#auClose", "#anClose", "#trClose", "#ksClose", "#edClose", "#coClose", "#ctClose"]) $(id).replaceChildren(icon("close"));
+  for (const id of ["#upClose", "#dClose", "#sClose", "#fClose", "#mClose", "#aClose", "#btClose", "#secClose", "#auClose", "#anClose", "#trClose", "#ksClose", "#edClose", "#coClose", "#ctClose", "#peClose", "#psClose"]) $(id).replaceChildren(icon("close"));
   for (const w of document.querySelectorAll(".selwrap")) w.append(icon("chev"));
 
   $("#q").addEventListener("input", (e) => { state.q = e.target.value; render(); });
@@ -6540,6 +7303,7 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     else if (e.key === "Escape"){ e.preventDefault(); closePalette(); }
   });
   $("#back").addEventListener("click", () => {
+    if (state.personId){ leavePerson(); return; }
     if (state.collectionId || state.smartId){
       state.collectionId = ""; state.smartId = "";
       state.tag = null; state.fav = false; state.vid = false; state.geo = false; state.q = ""; $("#q").value = "";
@@ -6582,7 +7346,7 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     closeSheets();
   });
   for (const id of ["#dClose", "#sClose", "#backdrop"]) $(id).addEventListener("click", closeSheets);
-  for (const id of ["#fClose", "#mClose", "#aClose", "#btClose", "#secClose", "#auClose", "#anClose", "#trClose", "#ksClose", "#edClose", "#coClose", "#ctClose", "#backdrop2"]) $(id).addEventListener("click", closeTop);
+  for (const id of ["#fClose", "#mClose", "#aClose", "#btClose", "#secClose", "#auClose", "#anClose", "#trClose", "#ksClose", "#edClose", "#coClose", "#ctClose", "#peClose", "#psClose", "#backdrop2"]) $(id).addEventListener("click", closeTop);
   const typingInField = () => {
     const el = document.activeElement;
     if (!el || el === document.body) return false;
@@ -6623,6 +7387,7 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
     if (e.key === "t" || e.key === "T"){ cycleTheme(); return; }
     if (e.key === "a" || e.key === "A"){ if (canUploadNow()) $("#file").click(); return; }
     if (e.key === "s" || e.key === "S"){ if (canEdit && state.loaded && !state.error) enterSelect(); return; }
+    if (e.key === "p" || e.key === "P"){ if (canEdit && state.loaded && !state.error && !shareMode) openPeopleSheet(); return; }
   });
   $("#fSave").addEventListener("click", saveFolder);
   $("#fDel").addEventListener("click", deleteFolder);
@@ -6634,6 +7399,27 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
   $("#sAnalytics").addEventListener("click", () => { closeSheets(); openAnalytics(); });
   $("#sTrash").addEventListener("click", () => { closeSheets(); openTrash(); });
   $("#sShortcuts").addEventListener("click", () => { closeSheets(); openShortcuts(); });
+  $("#sFaces").addEventListener("click", () => { closeSheets(); openPeopleSheet(); });
+  $("#peopleManage").addEventListener("click", openPeopleSheet);
+  $("#peClose").addEventListener("click", closeTop);
+  $("#psClose").addEventListener("click", closeTop);
+  $("#peScan").addEventListener("click", () => scanItems(unscannedItems().map((it) => it.id)));
+  $("#peScanAll").addEventListener("click", () => scanItems(state.items.filter((it) => !isVideo(it)).map((it) => it.id), {rescan:true}));
+  $("#peCancel").addEventListener("click", () => { faceScanGen++; faceScanning = false; faceStatus("Stopping…"); });
+  $("#peForget").addEventListener("click", forgetAllFaces);
+  $("#peAuto").addEventListener("change", () => writeLocal(FACE_AUTO_KEY, $("#peAuto").checked));
+  $("#peShowHidden").addEventListener("change", renderPeopleSheet);
+  $("#peMatch").addEventListener("click", () => $("#peFile").click());
+  $("#peCamera").addEventListener("click", () => $("#peCam").click());
+  $("#peFile").addEventListener("change", (e) => { const file = e.target.files && e.target.files[0]; e.target.value = ""; if (file) matchProbeFile(file); });
+  $("#peCam").addEventListener("change", (e) => { const file = e.target.files && e.target.files[0]; e.target.value = ""; if (file) matchProbeFile(file); });
+  $("#psSave").addEventListener("click", savePersonName);
+  $("#psName").addEventListener("keydown", (e) => { if (e.key === "Enter"){ e.preventDefault(); savePersonName(); } });
+  $("#psMergeGo").addEventListener("click", mergePerson);
+  $("#psHide").addEventListener("click", toggleHidePerson);
+  $("#psForget").addEventListener("click", forgetPerson);
+  $("#psOpen").addEventListener("click", () => { const id = personEditingId; closeTop(); if (id) openPerson(id); });
+  $("#dFaceScan").addEventListener("click", () => { const it = find(state.openId); if (it) scanItems([it.id], {rescan:true}); });
   $("#auSearch").addEventListener("input", renderAuditSheet);
   $("#auFilter").addEventListener("change", renderAuditSheet);
   $("#auActor").addEventListener("change", renderAuditSheet);
@@ -6808,6 +7594,7 @@ img.lqip{filter:blur(12px);transform:scale(1.06);transition:filter .25s ease}
           + " · Activity notice: link access, downloads and uploads are logged for the owner; file opens, filters and searches are not tracked"
           + (auditWebhookUrl() ? " and sent to their activity webhook." : "."));
       } else {
+        if (!shareMode){ try { await loadFaces(); } catch (e) { facesKnown = false; facesBlocked = true; facesError = e && e.message ? e.message : "Couldn't read saved face data, so it was left untouched."; } }
         applyRoute();
         if (state.demo) banner("Sample library · explore the features safely (including Security & Logins). Changes stay in this tab and reset on reload.");
         else if (repoWriter()){
